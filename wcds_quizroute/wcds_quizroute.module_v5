@@ -1,0 +1,590 @@
+<?php
+function wcds_quizroute_query_quizzes() {
+  return "
+    SELECT nid,vid,title
+    FROM {node}
+    WHERE status = 1 
+    AND type LIKE 'quiz'
+    ORDER BY nid,vid,title ASC
+    ;
+  ";
+}
+function wcds_quizroute_query_questions($question_node,$parent_nid,$parent_vid) {//discard
+  //edit form
+  $q = "
+  SELECT weight 
+  FROM {quiz_node_relationship} 
+  WHERE child_nid = ".$question_node->nid." 
+  AND child_vid = ".$question_node->vid." 
+  AND parent_nid = ".$parent_nid." 
+  AND parent_vid = ".$parent_vid." 
+  LIMIT 1;
+  ";
+  $r = db_query($q);
+  $obj_weight = db_fetch_object($r);  
+  //not associated with quiz for this question, no weight
+  if(!isset($obj_weight->weight)) {
+    $q = "
+    SELECT rel.*,rev.*
+    FROM {quiz_node_relationship} rel
+    INNER JOIN {node_revisions} rev ON rel.child_vid=rev.vid
+    ORDER BY rel.child_nid,rel.child_vid,rel.weight
+    ;
+    ";  
+    return $q;
+  }
+  //DO NOT INCLUDE THE CURRENT REVISION FOR THE QUIZ:
+  //CHANGING THE WEIGHT / ORDER OF QUESTIONS CHANGES THE 
+  //REVISION OF THE QUIZ BUT DOES NOT UPDATE QUIZ QUESTIONS IN TABLE NODE
+  //add form
+  $q = "
+    SELECT rel.*,rev.*
+    FROM {quiz_node_relationship} rel
+    INNER JOIN {node_revisions} rev ON rel.child_vid=rev.vid
+    WHERE rel.parent_nid = ".$parent_nid."
+    AND rel.parent_vid = ".$parent_vid."  
+    AND rel.weight < ".$obj_weight->weight." 
+    ORDER BY rel.child_nid,rel.child_vid,rel.weight
+    ;
+  ";
+  return $q;
+}
+function wcds_quizroute_query_child2parents($child_nid,$child_vid) {//discard
+  return "
+    SELECT parent_nid,parent_vid
+    FROM {quiz_node_relationship} 
+    WHERE child_nid = ".$child_nid." 
+    AND child_vid = ".$child_vid." 
+    ORDER BY weight ASC
+    ;
+  ";
+}
+
+//note these queries are not dependant on type - should they be?
+function wcds_quizroute_query_child2previouschildren($parent_nid,$parent_vid,$child_nid,$child_vid) {//discard
+  return "
+    SELECT n.type,r.child_nid,r.child_vid
+    FROM {quiz_node_relationship}  r
+    INNER JOIN {node} n ON child_nid=n.nid 
+    WHERE r.parent_nid = ".$parent_nid." 
+    AND r.parent_vid = ".$parent_vid." 
+    AND r.weight < 
+      (SELECT weight 
+      FROM {quiz_node_relationship} 
+      WHERE child_nid = ".$child_nid." 
+      AND child_vid = ".$child_vid." 
+      LIMIT 1)
+    ORDER BY r.weight ASC
+    ;
+  ";
+}
+
+function wcds_quizroute_query_child2answers($child_node_type,$child_nid,$child_vid) {//discard
+  if($child_node_type=='multichoice') {
+    return "
+      SELECT question_nid,question_vid,id,answer
+      FROM {quiz_multichoice_answers} 
+      WHERE question_nid = ".$child_nid." 
+      AND question_vid = ".$child_vid." 
+      ORDER BY id ASC
+      ;
+    ";
+  }else if($child_node_type=='matching') {
+    return "
+      SELECT nid,vid,match_id,question,answer
+      FROM {quiz_matching_node} 
+      WHERE nid = ".$child_nid." 
+      AND vid = ".$child_vid." 
+      ORDER BY match_id ASC
+      ;
+    ";
+  }  
+}
+
+/*
+UPDATE BOTH QUESTION TYPES FOR NOT PULLING FROM WCDS TABLES,
+INSTEAD PULLING FROM THE TABLE THAT HAS THE CURRENT VERSION
+OF THE QUESTION TYPES ANSWERS:
+
+{quiz_multichoice_answers question_nid  question_vid
+quiz_matching_node
+
+THEN SEE IF IT HAS ALREADY BEEN SET IN THE WCDS TABLES
+*/
+function wcds_quizroute_multichoice_query_wcds_answers($question_node,$quiz_nid,$quiz_vid,$prev_child_nid,$prev_child_vid,$prev_child_weight) {
+  $q = 
+  "
+  SELECT ma.*,r.body 
+  FROM  {quiz_multichoice_answers} ma 
+  INNER JOIN  {quiz_node_relationship} nr ON nr.child_nid=ma.question_nid 
+  LEFT JOIN {node_revisions} r on r.nid =ma.question_nid 
+  WHERE nr.parent_nid = ".$quiz_nid."
+  AND nr.parent_vid = ".$quiz_vid."
+  AND r.nid = ".$prev_child_nid."
+  AND r.vid = ".$prev_child_vid."
+  AND ma.question_nid = ".$prev_child_nid."
+  AND ma.question_vid= ".$prev_child_vid."
+  ORDER BY ma.id
+  ";
+  //echo $q;
+  return $q;
+}
+function wcds_quizroute_matching_query_wcds_answers($question_node,$quiz_nid,$quiz_vid,$prev_child_nid,$prev_child_vid,$prev_child_weight) {
+  $q = 
+  "
+  SELECT qmn.*,r.body 
+  FROM {quiz_matching_node} qmn
+  INNER JOIN  {quiz_node_relationship} nr ON nr.child_nid=qmn.nid 
+  LEFT JOIN {node_revisions} r on r.nid = qmn.nid 
+  WHERE nr.parent_nid = ".$quiz_nid."
+  AND nr.parent_vid = ".$quiz_vid."
+  AND qmn.nid = ".$prev_child_nid."
+  AND qmn.vid = ".$prev_child_vid."
+  AND r.nid = ".$prev_child_nid."
+  AND r.vid = ".$prev_child_vid."
+  AND qmn.nid = ".$prev_child_nid."
+  AND qmn.vid = ".$prev_child_vid."
+  ORDER BY qmn.match_id
+  ";
+  //echo $q;
+  return $q;
+}
+
+function wcds_quizroute_insert($node) {//discard
+  //loop through parents for this question
+  $q = wcds_quizroute_query_child2parents($node->nid,$node->vid);
+  $r = db_query($q);
+  while($obj = db_fetch_object($r)) {     
+    //get all previous questions to before this question in this quiz by weight
+    $q_prev = wcds_quizroute_query_child2previouschildren($obj->parent_nid,$obj->parent_vid,$node->nid,$node->vid);
+    $r_prev = db_query($q_prev);
+    while($obj_prev = db_fetch_object($r_prev)) {      
+      //get all answers to previous questions befor this question
+      $q_ans = wcds_quizroute_query_child2answers($obj_prev->type,$obj_prev->child_nid,$obj_prev->child_vid); 
+      //condition since $q_ans function is called once without a return value(unknown)
+      if(trim($q_ans)=="") continue;
+      //echo "<br/><br/>#-<br/><br/>";
+      $r_ans = db_query($q_ans);
+      while($obj_ans = db_fetch_object($r_ans)) {
+        //add to wcds table, SET DEFAULT TO NOT REQUIRE ANY PREVIOUS QUESTIONS IF NOT CHECKED
+        //if checkbox is not set
+        if($obj_prev->type=='multichoice') {
+          if( isset($_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid])&&
+             $_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid]==1) {
+            $is_required = $_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid];
+            //same as is_required==1        
+          }else {
+            $is_required = 0;
+          }
+          $this_obj_ans_id = $obj_ans->id.",";
+          $this_obj_ans_id_col = "answer_id,";
+          $question_value_col = "";
+          $question_value = "";
+        }else if($obj_prev->type=='matching') {
+          $prev_ans_node = node_load($obj_ans->nid);
+          if( isset($_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid])&&
+             $_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid]==1) {
+            $is_required = $_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid];
+            //same as is_required==1        
+          }else {
+            $is_required = 0;
+          }
+          $this_obj_ans_id_col = "match_id,";
+          $question_value_col = "question_value,";
+          $this_obj_ans_id = $obj_ans->match_id.",";
+          $question_value = "'".$obj_ans->question."',";
+        }
+        $q_insert = "
+        INSERT INTO {wcds_quizroute_".$obj_prev->type."} 
+        (quiz_nid,quiz_vid,
+        question_nid,question_vid,
+        previous_question_nid,previous_question_vid,".
+        $question_value_col.
+        $this_obj_ans_id_col.
+        "answer_value,
+        is_required_previous_question)
+        VALUES(".$obj->parent_nid.",".$obj->parent_vid.",
+        ".$node->nid.",".$node->vid.",
+        ".$obj_prev->child_nid.",".$obj_prev->child_vid.",".
+        $question_value.
+        $this_obj_ans_id.
+        "'".$obj_ans->answer."',
+        ".$is_required.")
+        ;
+        ";    
+        //drupal_set_message($q_insert);
+        db_query($q_insert);
+      }
+    }
+  }
+  $_SESSION["wcds"]=array();
+}
+
+//for deleting only on edits
+function wcds_quizroute_delete($node) {//discard
+  //loop through parents for this question
+  $q = wcds_quizroute_query_child2parents($node->nid,$node->vid);
+  $r = db_query($q);
+  while($obj = db_fetch_object($r)) {
+    //get all previous questions to before this question in this quiz by weight
+    $q_prev = wcds_quizroute_query_child2previouschildren($obj->parent_nid,$obj->parent_vid,$node->nid,$node->vid);
+    $r_prev = db_query($q_prev);
+    while($obj_prev = db_fetch_object($r_prev)) {
+      if(in_array($obj_prev->type,wcds_quizroute_routable_question_types())) {
+        //delete by previous and current question FOR ALL REVISIONS
+        $q_delete = "
+        DELETE FROM {wcds_quizroute_".$obj_prev->type."} 
+        WHERE 
+        (question_nid=".$node->nid." /*AND question_vid=".$node->vid."*/) AND  
+        (previous_question_nid=".$obj_prev->child_nid." /*AND previous_question_vid=".$obj_prev->child_vid."*/) 
+        ;
+        ";      
+        //echo $q_delete; echo "<br/>";
+        db_query($q_delete);
+      }
+    }
+  }
+}
+
+function wcds_quizroute_update($node) {//discard
+  wcds_quizroute_delete($node);
+  wcds_quizroute_insert($node);
+}
+
+function wcds_quizroute_takequiz($node) {
+  global $user;
+  if($_SESSION[skip_bool]==1) {
+    $_SESSION[skip_bool]=0;
+    unset($_SESSION[skip_bool]);
+    return ;
+  }
+  //condition for taking test
+  if(isset($_SESSION["this_quiz_node"])&&$_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"]) {
+    foreach(wcds_quizroute_routable_question_types() AS $k=>$routable_question_name) {
+      //no version numbers in this query
+      $q_wcds = "
+      SELECT * 
+      FROM {wcds_quizroute_".$routable_question_name."} 
+      WHERE question_nid = ".$node->nid."
+      AND quiz_nid = ".$_SESSION['this_quiz_node']->nid."
+      ";
+      $r_wcds = db_query($q_wcds);
+      //print_r($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"]);
+      //print_r($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]);          
+      $this_result_id = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"];                    
+      //loop through all results and verify answers align
+      //if they dont align, skip over this question, compare to quiz user results tables
+      $skip = 0;
+      $in_str = "'placeholder'";
+      $answer_id_str = array();
+      while($obj_wcds = db_fetch_object($r_wcds)) {  
+        //create IN string of answer ids,
+        //checks for 1 or more than 1 answer id routed
+        if($obj_wcds->is_required_previous_question == 1) {
+          //get node type of previous questions
+          $prev_node = node_load($obj_wcds->previous_question_nid);
+
+          //$in_str .= ",".$obj_wcds->answer_id;
+          //for 1 question
+          //select where answer id from wcds aligns with in string from results_answers table
+          //use results table only for quiz node and uid verifying in wcds and
+          if($prev_node->type=='multichoice') {
+            $q_results_answers = "
+            SELECT COUNT(*) AS cnt 
+            FROM {quiz_multichoice_user_answer_multi} uam
+            INNER JOIN {quiz_multichoice_answers} a ON a.id=uam.answer_id
+            INNER JOIN {quiz_multichoice_user_answers} ua ON ua.id=uam.user_answer_id
+            INNER JOIN {quiz_node_results_answers} ra ON ra.result_id=ua.result_id
+            INNER JOIN {quiz_node_results} r ON r.result_id=ua.result_id
+            WHERE uam.answer_id IN (".$obj_wcds->answer_id.") 
+            AND r.uid=".$user->uid."
+            AND ra.result_id=".$this_result_id."
+            ";           
+          }else if($prev_node->type=='matching') {
+            $q_results_answers = "
+            SELECT COUNT(*) AS cnt 
+            FROM {quiz_matching_user_answers} ua
+            INNER JOIN {quiz_matching_node} mn ON mn.match_id=ua.match_id
+            INNER JOIN {quiz_node_results_answers} ra ON ra.result_id=ua.result_id
+            INNER JOIN {quiz_node_results} r ON r.result_id=ua.result_id
+            WHERE ua.match_id IN (".$obj_wcds->match_id.") 
+            AND ua.answer IN (".$obj_wcds->match_id.")               
+            AND r.uid=".$user->uid."
+            AND ra.result_id=".$this_result_id."
+            "; 
+          }  
+
+          $r_results_answers = db_query($q_results_answers);
+          $obj_results_answers = db_fetch_object($r_results_answers);
+          if($obj_results_answers->cnt<1) {
+            $skip=1;
+            break;
+          }
+        }
+      }
+
+      $former_question_arrays = 
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["previous_quiz_questions"];
+
+      //drupal_set_message("SKIP::".$skip);
+      //drupal_set_message("FORMERQUESTIONARRAYSIZE::".sizeof($former_question_arrays));
+
+      if($skip>0&&sizeof($former_question_arrays)>0) {
+        // Load the last asked question.
+        $former_question_array = array_shift($former_question_arrays);
+
+        $former_question = node_load($former_question_array['nid'], 
+          $former_question_array['vid']);
+
+        //see quiz.module line 1814
+        // Advance the question.
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['previous_quiz_questions'][] = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['quiz_questions'][0];
+
+        // Load the last asked question.
+        $former_question_array = array_shift($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['quiz_questions']);
+        $former_question = node_load($former_question_array['nid'], $former_question_array['vid']);
+        // Call hook_skip_question().
+        $module = quiz_question_module_for_type($former_question->type);
+        if (!$module) return array('body' => array('#value' => ' '));
+        $result = module_invoke($module, 'skip_question', $former_question, 
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['result_id']);
+        // Store that the question was skipped:
+        $quiz = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid];
+        quiz_store_question_result($quiz, $result, array('set_msg' => TRUE, 
+        'question_data' => $former_question_array));
+
+ /*
+$_SESSION[skip_bool]=1;
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
+header("Location: ".$url_redirect_skip);
+
+if(arg(3)=='skip') {
+  //echo arg(3)."++++++++++++++";
+exit;
+}
+
+//SEE IF YOU CAN FIND A WAY TO SEND IT TO THE NEXT UNSKIPPED QUESTION
+//BEFORE THE PAGE LOADS: QUIZ DOESNT KNOW IT HAS BEEN SKIPPED AT THIS POINT
+//
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI]."/skip";
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
+//echo $url_redirect_skip;
+//ACTUALLY YOU WILL WANT TO PUT THIS IN THE PREPROCESS FUNCTION?  PUTTING IT HERE IS AN INFINITE REDIRECT
+//or use a key skip=1 to only reload once
+header("Location: ".$url_redirect_skip);
+exit;
+//header("Location: http://www.google.com");
+*/
+  //avoid reloading on page results after completing quiz
+  if ( arg(2) == 'results') return;
+
+        drupal_set_html_head('<meta http-equiv="refresh" content="0" />');
+      }     
+    }
+  }
+
+  if(isset($_SESSION["this_quiz_node"])) {
+    unset($_SESSION["this_quiz_node"]);
+  }
+}
+
+
+function wcds_quizroute_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  if(!isset($node->nid)) return;
+
+  //avoid reloading on page results after completing quiz
+  if ( arg(2) == 'results') return;
+
+  //quiz form on question edit form (for adding and removing questions from quiz)
+  if(arg(2)=='questions'&&$node->type=='quiz') {
+    switch ($op) {
+      case t('insert'):  
+      break;
+    }  
+  }
+
+  if ( $node->type == 'quiz') {
+    //remove from and add question to quiz without deleting?  move question to another quiz?  
+    //same question on multiple quizes
+    if(arg(2)=='questions') return;
+    $_SESSION["this_quiz_node"]=$node;//for use in wcds table for storing
+  }
+
+  if( in_array($node->type,wcds_quizroute_question_types()) && $node->type!='quiz') {
+    switch ($op) {
+      case t('insert'):   
+        wcds_quizroute_insert($node);
+        //render checkboxes with default values
+        break;        
+      case t('delete revision'):   
+        wcds_quizroute_delete($node);
+        break;        
+      case t('delete'):   
+        wcds_quizroute_delete($node);
+        break;        
+      case t('update'):   
+        wcds_quizroute_update($node);
+        //render checkboxes with default values
+        //update wcds by answer id for changes to answer and changes 
+        //to revision of quiz and question
+        //no key so cannot insert-update
+        //delete in the same way as 'delete'
+        //insert in the same way as insert
+        break;        
+      case t('view'):   
+        wcds_quizroute_takequiz($node);
+        break;        
+      case t('prepare'):   
+        break;        
+    }
+  }
+}
+
+function wcds_quizroute_question_types() {
+  return array('multichoice','matching','truefalse','short_answer','long_answer','scale','direction');
+}
+function wcds_quizroute_routable_question_types() {
+  //return array('multichoice','matching','truefalse');
+  return array('multichoice','matching');
+}
+
+/**
+ * Implements hook_form_alter()
+ * 
+ * Add form elements to admin form for this node type.
+ * 
+ * @param $form
+ *   Form elements
+ * 
+ * @param $form_state
+ *   Form values
+ * 
+ * @param $form_id
+ *   Form id
+ * 
+ */
+function wcds_quizroute_form_alter($form, $form_state, $form_id) {    
+  $node = node_load(arg(1));
+  if( in_array($form['#node']->type,wcds_quizroute_question_types()) && $form['#node']->type!='quiz') 
+  {
+    $function_query_quizzes =  "wcds_quizroute_query_quizzes";
+    //echo $function_query_quizzes();
+    $r_quizzes = db_query($function_query_quizzes());   
+    while($obj_quizzes = db_fetch_object($r_quizzes)) {
+     /*only show checkbox fieldsets for quizzes on edit form, not add form*/
+     if(!isset($form["add_directly"]["already"]["#default_value"])) {
+        continue;
+     }
+      /* show checkbox fieldset only if this question is added to the fieldset for the quiz.  This implies adding questions will not include any checkbox fieldsets*/
+      if(!in_array($obj_quizzes->nid."-".$obj_quizzes->vid,$form["add_directly"]["already"]["#default_value"])) {
+        continue;
+      }
+      $quiz_key = "wcds_quiz_".$obj_quizzes->nid;
+      $quiz_key = $obj_quizzes->nid;
+      $form["wcds"][$quiz_key] = array(
+        '#type' => 'fieldset',
+        '#title' => t('WCDS Quiz Route: '.$obj_quizzes->title),
+        '#collapsible' => TRUE,
+        /*'#collapsed' => TRUE,*/
+        '#attributes' => array('class' => 'wcds'),
+      );
+      $function_query_questions = "wcds_quizroute_query_questions";
+      $q_questions = $function_query_questions($form['#node'],$obj_quizzes->nid,$obj_quizzes->vid);
+      $r_questions = db_query($q_questions);
+      while($obj_questions = db_fetch_object($r_questions)) {
+        //do not include checkboxes for this question
+        if($node->nid==$obj_questions->child_nid) continue;
+        $question_key = "wcds_question_".$obj_questions->child_nid;
+        $question_key = $obj_questions->child_nid;
+        /*question as fieldset*/
+        $form["wcds"][$quiz_key][$question_key] = array(
+          '#type' => 'fieldset',
+          '#title' => t($obj_questions->teaser),
+          '#description' => t($obj_questions->body),
+          '#weight' => t($obj_questions->weight),
+          '#collapsible' => TRUE,
+          /*'#collapsed' => True*/
+        ); 
+
+        foreach(wcds_quizroute_routable_question_types() AS $k=>$routable_question_name) {
+          //$module_name = "wcds_quizroute_".$routable_question_name;
+          //if(!module_exists('module_name')) continue;
+          $function_query_wcds_answers = "wcds_quizroute_".$routable_question_name."_query_wcds_answers";
+          $q_answers = $function_query_wcds_answers($form['#node'],$obj_quizzes->nid,$obj_quizzes->vid,$obj_questions->child_nid,$obj_questions->child_vid,$obj_questions->weight);
+          $r_answers = db_query($q_answers);
+          $_SESSION["wcds"]=array();//unsetting from any previous
+          while($obj_answers = db_fetch_object($r_answers)) {
+            if($routable_question_name=='matching') { 
+              $q_is_required_previous_question = "
+              SELECT is_required_previous_question FROM {wcds_quizroute_matching} 
+              WHERE question_nid = ".$form['#node']->nid." 
+              AND question_vid = ".$form['#node']->vid. " 
+              AND previous_question_nid = ".$obj_questions->child_nid. " 
+              AND previous_question_vid = ".$obj_questions->child_vid. " 
+              AND match_id = ".$obj_answers->match_id;
+              //echo $q_is_required_previous_question;
+              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
+              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
+              $prev_question_key = $obj_questions->child_nid;
+              $answer_key = $obj_answers->match_id;
+              $obj_title_str = $obj_answers->question." >> ".$obj_answers->answer;
+              $answer_name = "wcds_".$answer_key."_".$prev_question_key;
+            }else if($routable_question_name=='multichoice') {
+              $q_is_required_previous_question = "
+              SELECT is_required_previous_question FROM {wcds_quizroute_multichoice} 
+              WHERE question_nid = ".$form['#node']->nid." 
+              AND question_vid = ".$form['#node']->vid. " 
+              AND previous_question_nid = ".$obj_questions->child_nid. " 
+              AND previous_question_vid = ".$obj_questions->child_vid. " 
+              AND answer_id = ".$obj_answers->id;
+              //echo $q_is_required_previous_question;
+              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
+              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
+              $prev_question_key = $obj_questions->child_nid;
+              $answer_key = $obj_answers->id;
+              $obj_title_str = $obj_answers->answer;
+              $answer_name = "wcds_".$answer_key."_".$prev_question_key;
+            }
+            $form["wcds"][$quiz_key][$question_key][$answer_key] = 
+              array(
+                '#type' => 'checkbox',
+                '#title' => t($obj_title_str),
+                '#id' => t($answer_name),
+                '#name' => t($answer_name),
+                '#default_value' => t($obj_is_required_previous_question->is_required_previous_question),
+                /*'#default_value' => t('checked'),*/
+                '#required' => FALSE,
+                /*'#weight' => 1,*/
+              );
+            //$_SESSION["wcds"][$answer_name]=t($obj_answers->is_required_previous_question);
+            $_SESSION["wcds"][$answer_name]=-1;
+          }
+        }
+      }
+    }
+    $form['#validate'][] = 'wcds_quizroute_form_validate';
+    /* call submit handler on this node type form */
+    $form['#submit'] = array('wcds_quizroute_form_submit_handler');    
+  }
+}
+
+/**
+ * Implements hook_submit_handler()
+ * 
+ * Extend product edit form submit for including redirect field
+ * 
+ * @param $form
+ *   Form elements
+ * 
+ * @param $form_state
+ *   Form values
+ */
+function wcds_quizroute_form_submit_handler($form, &$form_state) {
+  //update session answers with what users changed on form
+  foreach($form_state["clicked_button"]["#post"] AS $k=>$v) {
+    if(preg_match("/wcds/i",$k)) {    
+      //echo $k."=".$v."<br/>";
+      $_SESSION["wcds"][$k]=$v;
+    }
+  }  
+}

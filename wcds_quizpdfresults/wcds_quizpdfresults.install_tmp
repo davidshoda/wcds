@@ -1,0 +1,200 @@
+<?php
+// $Id: wcds_quizroute_multichoice.install,v 1.10.2.1 2011/01/06 15:46:36 goba Exp $
+
+/**
+ * Implementation of hook_install().
+ */
+function wcds_quizroute_install() {
+  // Create tables.
+  drupal_install_schema('wcds_quizroute');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function wcds_quizroute_uninstall() {
+  // Remove tables.
+  drupal_uninstall_schema('wcds_quizroute');
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function wcds_quizroute_schema() {
+  $schema = array();
+
+
+
+
+
+  $schema['wcds_quizroute_multichoice'] = array(
+    'description' => 'Routes next question from how previous questions were answered',
+    'fields' => array(
+      'quiz_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Quiz nid ',
+      ),      
+      'quiz_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Quiz vid ',
+      ),     
+      'question_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Question node id',
+      ),   
+      'question_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Question node vid',
+      ),  
+      'previous_question_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Previous question node ids',
+      ),   
+      'previous_question_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Previous question node revision ids',
+      ),   
+      'answer_id' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Id from quiz_multichoice_answers',
+      ),     
+      'answer_value' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'description' => 'for other question types',
+      ),     
+      'is_required_previous_question' => array(
+        'type' => 'int',
+        'length' => 1,
+        'not null' => TRUE,
+        'description' => 'require this question as 1, does not require as 0',
+      ), 
+    ),
+    'indexes' => array(
+      'quiz_nid' => array('quiz_nid'),
+      'quiz_vid' => array('quiz_vid'),
+      'question_nid' => array('question_nid'),
+      'question_vid' => array('question_vid'),
+      'previous_question_nid' => array('previous_question_nid'),
+      'previous_question_vid' => array('previous_question_vid'),
+      'answer_id' => array('answer_id'),
+    ),
+  );
+
+
+
+
+
+
+
+
+
+
+
+
+
+  $schema['wcds_quizroute_matching'] = array(
+    'description' => 'Routes next question from how previous questions were answered',
+    'fields' => array(
+      'quiz_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Quiz nid ',
+      ),      
+      'quiz_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Quiz vid ',
+      ),     
+      'question_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Question node id',
+      ),   
+      'question_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Question node vid',
+      ),  
+      'previous_question_nid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Previous question node ids',
+      ),   
+      'previous_question_vid' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Previous question node revision ids',
+      ),   
+      'match_id' => array(
+        'type' => 'int',
+        'length' => 10,
+        'not null' => TRUE,
+        'description' => 'Id from quiz_matching_answers',
+      ),     
+      'question_value' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'description' => 'matching question',
+      ), 
+      'answer_value' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+        'description' => 'matching answer',
+      ),        
+      'is_required_previous_question' => array(
+        'type' => 'int',
+        'length' => 1,
+        'not null' => TRUE,
+        'description' => 'require this question as 1, does not require as 0',
+      ), 
+    ),
+    'indexes' => array(
+      'quiz_nid' => array('quiz_nid'),
+      'quiz_vid' => array('quiz_vid'),
+      'question_nid' => array('question_nid'),
+      'question_vid' => array('question_vid'),
+      'previous_question_nid' => array('previous_question_nid'),
+      'previous_question_vid' => array('previous_question_vid'),
+      'match_id' => array('match_id'),
+    ),
+  );
+
+
+
+
+
+
+
+
+
+
+
+
+
+  return $schema;
+}
+

@@ -1,0 +1,274 @@
+<?php
+require_once('lib/tcpdf/tcpdf.php');
+require_once('lib/tcpdf/config/lang/eng.php');
+
+//driver
+function wcds_quizpdfresults() {
+  $uid = arg(2);
+  $output = "";
+  if( !isset($uid) ) {
+    drupal_flush_all_caches();
+    //Run report when they arrive on page
+    $output .= wcds_quizpdfresults_results_by_quiz();
+    $output .= "<br/>" ;
+    $output .= "<br/>" ;
+    $output .= "<hr/>" ;
+    $output .= "<br/>" ;
+    $output .= wcds_quizpdfresults_by_user();
+    return $output;
+
+  } else  {
+    //echo "write pdf reports for this user<br/>";
+    $output .= wcds_quizpdfresults_by_userresults($uid);
+    return $output;
+  } 
+}
+
+
+function wcds_quizpdfresults_results_by_quiz() {
+  global $base_url;
+
+
+  $file_path = 
+    drupal_get_path('module', 'wcds_quizpdfresults') . '/pdfs/compliance_report.pdf' ;
+  
+  if( file_exists($file_path) ) unlink($file_path);
+  $q = wcds_quizpdfresults_results_by_quiz_query();
+  $r = db_query($q);
+
+  $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true);
+  $pdf->SetPrintHeader(false); $pdf->SetPrintFooter(false);
+
+  $cols=array('Quiz Title','User Name','User Email','Score','Max Score','Pass Rate','Time Start','Time End');
+  $width=array(75,50,50,15,15,15,30,30); //amount of elements must correspond with $header array above
+  /*
+  SELECT n.title, qnr.result_id, qnr.nid, qnr.vid, qnr.time_start, qnr.time_end, qnr.score, qnr.is_invalid,      
+  qnr.is_evaluated, qnp.max_score, qnp.pass_rate, u.uid, u.name, u.mail
+  */
+
+  $page_1 = 1;
+  $rows_per_page = 25; 
+  $rows_per_page_inc = 0; 
+  //create & populate table cells
+  while($obj = db_fetch_object($r)) {
+    if($rows_per_page_inc == $rows_per_page || $page_1 == 1) {
+      $page_1 = 0;
+      $rows_per_page_inc = 0; 
+
+      $pdf->SetFont('freeserif', '', 9);
+      //Colors, line width and bold font for the header
+      $pdf->SetFillColor(11, 47, 132); //background color of next Cell
+      $pdf->SetTextColor(255); //font color of next cell
+      $pdf->SetFont('','B'); //b for bold
+      $pdf->SetDrawColor(0); //cell borders - similiar to border color
+      $pdf->SetLineWidth(.3); //similiar to cellspacing
+      $pdf->AddPage("L");
+      for($i = 0; $i < count($cols); $i++) {
+        //void Cell( float $w, [float $h = 0], [string $txt = ''], [mixed $border = 0],
+        //[int $ln = 0], [string $align = ''], [int $fill = 0], [mixed $link = ''], [int $stretch = 0]) 
+        $pdf->Cell($width[$i],7,$cols[$i],1,0,'C',1);
+      }
+    }
+    $pdf->Ln(); //new row
+    //styling for normal non header cells
+    $pdf->SetTextColor(0); //black
+    $pdf->SetFont('','',9);
+    //$pdf->SetFillColor(255); //white
+    $pdf->SetFillColor(200); //white  
+    
+    $pdf->MultiCell($width[0],7,$obj->title,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[1],7,$obj->name,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[2],7,$obj->mail,1,'C',1,0,'','',1,0,1);
+    $pdf->MultiCell($width[3],7,$obj->score,1,'C',1,0,'','',1,0,1);
+    $pdf->MultiCell($width[4],7,$obj->max_score,1,'C',1,0,'','',1,0,1);
+    $pdf->MultiCell($width[5],7,$obj->pass_rate,1,'C',1,0,'','',1,0,1);
+    $tmp_date = date("Y-m-d, g:ia",$obj->time_start);
+    $pdf->MultiCell($width[6],7,$tmp_date,1,'C',1,0,'','',1,0,1);
+    $tmp_date = date("Y-m-d, g:ia",$obj->time_end);
+    $pdf->MultiCell($width[7],7,$tmp_date,1,'C',1,0,'','',1,0,1);
+
+    $rows_per_page_inc++;
+  }
+
+
+  //file header
+  $pdf->SetFont( '', '', 10 );
+  $pdf->SetY( 5, true );
+  $pdf->Cell( 10, 0, "Compliance Report Scores" );
+
+  //output the PDF to the browser
+  $pdf->Output( $file_path , 'F');
+
+
+  return "<a target='_blank' href='".$base_url."/".$file_path."'>Compliance Report Scores</a>";
+}
+
+//for one pdf, all users and all quizzes
+function wcds_quizpdfresults_results_by_quiz_query() {
+  return "
+SELECT n.title, qnr.result_id, qnr.nid, qnr.vid, qnr.time_start, qnr.time_end, qnr.score, qnr.is_invalid, qnr.is_evaluated, qnp.max_score, qnp.pass_rate, u.uid, u.name, u.mail
+FROM {node} n
+INNER JOIN {quiz_node_results} qnr ON qnr.nid = n.nid
+INNER JOIN {users} u ON qnr.uid = u.uid
+INNER JOIN {quiz_node_properties} qnp ON qnr.nid = qnp.nid
+WHERE n.type LIKE 'quiz'
+ORDER BY qnr.nid, qnr.result_id, qnr.time_start, qnr.score, u.name, u.mail
+  ";
+}
+
+
+function wcds_quizpdfresults_by_user() {
+  global $base_url;
+  $q = wcds_quizpdfresults_by_user_query();
+  $r = db_query($q);
+  $user_lines = "";
+  while($obj = db_fetch_object($r)) {
+    $user_lines .= "<a target='_blank' href='?q=".$_GET[q]."/".$obj->uid."'>".$obj->name."</a>";
+    $user_lines .= "<br/>"; 
+  }
+  return $user_lines;
+}
+
+
+//for one pdf per user and quiz, include questions and answers
+function wcds_quizpdfresults_by_user_query() {
+  return "
+SELECT u.*
+FROM {users} u 
+ORDER BY u.name
+  ";
+}
+
+
+function wcds_quizpdfresults_by_userresults($uid) {
+  global $base_url;
+
+  $q = wcds_quizpdfresults_by_userresults_query($uid);
+  $r = db_query($q);
+  $user_lines = "";
+
+  while($obj = db_fetch_object($r)) {
+    $user_lines .= "<a target='_blank' href='".$base_url."/".
+    drupal_get_path('module', 'wcds_quizpdfresults') . 
+    "/pdfs/".$obj->uid."_".$obj->result_id.".pdf'>".$obj->title."</a>";
+    $user_lines .= wcds_quizpdfresults_by_userresultsquiz($obj->result_id,$obj->title,$obj->uid,$obj->name);
+    $user_lines .= "<br/>"; 
+  }
+  return $user_lines;
+}
+
+//for one pdf per user and quiz, include questions and answers
+function wcds_quizpdfresults_by_userresults_query($uid) {
+  return "
+SELECT u.uid, u.name, n.title, qnr. *
+FROM {users} u
+INNER JOIN {quiz_node_results} qnr ON u.uid = qnr.uid
+INNER JOIN {node} n ON n.nid = qnr.nid
+WHERE u.uid = ".$uid."
+ORDER BY qnr.result_id
+  ";
+}
+
+
+
+
+
+function wcds_quizpdfresults_by_userresultsquiz($result_id,$quiz_title,$uid,$username) {
+  global $base_url;
+
+/*
+  $q = wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id);
+  echo "<hr/>";
+  echo $q;
+  echo "<hr/>";
+  $r = db_query($q);
+  $questionanswer_lines = "";
+
+  while($obj = db_fetch_object($r)) {
+    $questionanswer_lines .= $obj->title." : ".$obj->answer;
+    $questionanswer_lines .= "<br/>";
+  }
+  return $questionanswer_lines;
+*/
+
+  $file_path = 
+    drupal_get_path('module', 'wcds_quizpdfresults') . '/pdfs/'.$uid.'_'.$result_id.'.pdf' ;
+  
+
+  $q = wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id);
+  $r = db_query($q);
+
+  $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true);
+  $pdf->SetPrintHeader(false); $pdf->SetPrintFooter(false);
+
+
+  $cols=array('#','Question Title','User Answer','Correct','Points');
+  $width=array(15,150,75,15,15); //amount of elements must correspond with $header array above
+  $page_1 = 1;
+  $rows_per_page = 25; 
+  $rows_per_page_inc = 0; 
+  //create & populate table cells
+  while($obj = db_fetch_object($r)) {
+    if($rows_per_page_inc == $rows_per_page || $page_1 == 1) {
+      $page_1 = 0;
+      $rows_per_page_inc = 0; 
+
+      $pdf->SetFont('freeserif', '', 9);
+      //Colors, line width and bold font for the header
+      $pdf->SetFillColor(11, 47, 132); //background color of next Cell
+      $pdf->SetTextColor(255); //font color of next cell
+      $pdf->SetFont('','B'); //b for bold
+      $pdf->SetDrawColor(0); //cell borders - similiar to border color
+      $pdf->SetLineWidth(.3); //similiar to cellspacing
+      $pdf->AddPage("L");
+
+      for($i = 0; $i < count($cols); $i++) {
+        //void Cell( float $w, [float $h = 0], [string $txt = ''], [mixed $border = 0],
+        //[int $ln = 0], [string $align = ''], [int $fill = 0], [mixed $link = ''], [int $stretch = 0]) 
+        $pdf->Cell($width[$i],7,$cols[$i],1,0,'C',1);
+      }
+    }
+    $pdf->Ln(); //new row
+    //styling for normal non header cells
+    $pdf->SetTextColor(0); //black
+    $pdf->SetFont('','',9);
+    //$pdf->SetFillColor(255); //white
+    $pdf->SetFillColor(200); //white  
+    
+    $pdf->MultiCell($width[0],7,$obj->number,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[1],7,$obj->title,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[2],7,$obj->answer,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[3],7,$obj->is_correct,1,'C',1,0,'','',1,0,1); 
+    $pdf->MultiCell($width[4],7,$obj->points_awarded,1,'C',1,0,'','',1,0,1); 
+    $rows_per_page_inc++;
+  }
+
+  //file header
+  $pdf->SetFont( '', '', 10 );
+  $pdf->SetY( 5, true );
+  $pdf->Cell( 10, 0, $quiz_title." : ".$username );
+
+  //output the PDF to the browser
+  $pdf->Output( $file_path , 'F');
+
+
+  return "<a target='_blank' href='".$base_url."/".$file_path."'>".$obj->title."</a>";
+
+}
+
+//query questions and answers
+function wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id) {
+  return "
+SELECT ra . * , n.title, laua.answer , /* mua.*,muam.*,*/ma.answer
+FROM {quiz_node_results_answers} ra
+INNER JOIN {node} n ON n.nid = ra.question_nid
+LEFT JOIN {quiz_long_answer_user_answers} laua ON laua.question_nid = ra.question_nid 
+LEFT JOIN {quiz_multichoice_user_answers} mua ON mua.question_nid = ra.question_nid
+INNER JOIN {quiz_multichoice_user_answer_multi} muam ON muam.user_answer_id = mua.id
+INNER JOIN {quiz_multichoice_answers} ma ON ma.id = muam.answer_id
+WHERE ra.result_id = ".$result_id." 
+AND ( mua.result_id =".$result_id." OR laua .result_id =".$result_id.")
+ORDER BY ra.number
+  ";
+
+}

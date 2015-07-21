@@ -1,0 +1,11 @@
+; $Id: wcds_quizroute.info,v 1.6 2011/04/14 01:01:01 davidshoda Exp $
+package         = "WCDS Compliance: Quiz Route"
+name = Quiz PDF reports
+description = Creates pdf reports on quiz results
+core = 6.x
+dependencies[] = autoload
+dependencies[] = quiz
+dependencies[] = php
+;dependencies[] = webform
+datestamp = "1307986854"
+
