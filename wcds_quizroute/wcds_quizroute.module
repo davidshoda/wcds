@@ -1,822 +1,663 @@
-3fe30d
+<?php
 function wcds_quizroute_query_quizzes() {
   return "
-    b6ada9 6f1f41f11f6d2c
+    SELECT nid,vid,title
     FROM {node}
     WHERE status = 1 
-    ef7 657b 1135 5802f0f
+    AND type LIKE 'quiz'
     ORDER BY nid,vid,title ASC
     ;
-  a7f
+  ";
 }
 function wcds_quizroute_query_questions($question_node,$parent_nid,$parent_vid) {//discard
-  6fce51 0eef0
+  //edit form
   $q = "
   SELECT weight 
-  5a51 3e404860b1c4cada32824d55 
-
+  FROM {quiz_node_relationship} 
   WHERE child_nid = ".$question_node->nid." 
   AND child_vid = ".$question_node->vid." 
-  52c cddcfb49cd 2 f2311a8632be4
-5 5
+  AND parent_nid = ".$parent_nid." 
   AND parent_vid = ".$parent_vid." 
   LIMIT 1;
-  d55
+  ";
   $r = db_query($q);
   $obj_weight = db_fetch_object($r);  
-  c8acf a2521494c5 d478 31a3 1d5 33c8 cf1a25214 4c ad47853
+  //not associated with quiz for this question, no weight
   if(!isset($obj_weight->weight)) {
     $q = "
-    c7d5e3 63603e9f79f3
-    FROM {quiz_node_relationship} rel
-    INNER JOIN {node_revisions} rev ON rel.child_vid=rev.vid
-    14e33 6e 8ad649fbbabaf1889fb
-efe814e33a6e78ad649
-    ;
-    ";  
-    84ba5c a3a1
-  }
-  //DO NOT INCLUDE THE CURRENT REVISION FOR THE QUIZ:
-  d74b3fe0fa d41 b17016 7 a176b 
-7 d74b3fe0f 2d41cb1 016 7
-  //REVISION OF THE QUIZ BUT DOES NOT UPDATE QUIZ QUESTIONS IN TABLE NODE
-  //add form
-  67 5 4a
     SELECT rel.*,rev.*
     FROM {quiz_node_relationship} rel
-    ed27f 1fef 48400eb0d5e40679 
-03 de 27f01fef348400eb0d5e40
-    WHERE rel.parent_nid = ".$parent_nid."
-    AND rel.parent_vid = ".$parent_vid."  
-    e7e c4708a2f0c 2 9c65ce84181
-acfbe7e3c47 8
+    INNER JOIN {node_revisions} rev ON rel.child_vid=rev.vid
     ORDER BY rel.child_nid,rel.child_vid,rel.weight
     ;
-  344
+    ";  
+    return $q;
+  }
+  //DO NOT INCLUDE THE CURRENT REVISION FOR THE QUIZ:
+  //CHANGING THE WEIGHT / ORDER OF QUESTIONS CHANGES THE 
+  //REVISION OF THE QUIZ BUT DOES NOT UPDATE QUIZ QUESTIONS IN TABLE NODE
+  //add form
+  $q = "
+    SELECT rel.*,rev.*
+    FROM {quiz_node_relationship} rel
+    INNER JOIN {node_revisions} rev ON rel.child_vid=rev.vid
+    WHERE rel.parent_nid = ".$parent_nid."
+    AND rel.parent_vid = ".$parent_vid."  
+    AND rel.weight < ".$obj_weight->weight." 
+    ORDER BY rel.child_nid,rel.child_vid,rel.weight
+    ;
+  ";
   return $q;
 }
-0a36a805 19a33bfc8e4eb87c0cd57b3
-0a36a805f19a33bfc8e4eb87c0cd57b3
- a36a805f19a
+function wcds_quizroute_query_child2parents($child_nid,$child_vid) {//discard
   return "
     SELECT parent_nid,parent_vid
-    7bbe 43d6ba3c3ef63d8aa33e8aa
- 7
+    FROM {quiz_node_relationship} 
     WHERE child_nid = ".$child_nid." 
     AND child_vid = ".$child_vid." 
-    ba1c0 98 980898 7aa6
+    ORDER BY weight ASC
     ;
   ";
-71
+}
 
 //note these queries are not dependant on type - should they be?
-9a8e1790 a4125ea2dcd7e1a4aa6bddf
-9a8e1790ea4125ea2dcd7e1a4aa6bddf
-9a8e1790ea4125ea2dcd7e1a4aa6bddf
- a8e1790ea41
+function wcds_quizroute_query_child2previouschildren($parent_nid,$parent_vid,$child_nid,$child_vid) {//discard
   return "
     SELECT n.type,r.child_nid,r.child_vid
-    740b 2987ccbb4a5252742388d54
-  5b
+    FROM {quiz_node_relationship}  r
     INNER JOIN {node} n ON child_nid=n.nid 
     WHERE r.parent_nid = ".$parent_nid." 
-    e38 58025bb5e3ba 3 cf2156cae
-c6cbe 8
+    AND r.parent_vid = ".$parent_vid." 
     AND r.weight < 
       (SELECT weight 
-      02a8 edcdfb91f48fb3d58a40f
-17 f
+      FROM {quiz_node_relationship} 
       WHERE child_nid = ".$child_nid." 
       AND child_vid = ".$child_vid." 
-      516b0 78b
+      LIMIT 1)
     ORDER BY r.weight ASC
     ;
-  1c1
+  ";
 }
 
-a8cd227d 0f9f056f85f7d217ed5e723
-a8cd227de0f9f056f85f7d217ed5e723
-a8cd227de0f9f056f 5f7d217ed5e
+function wcds_quizroute_query_child2answers($child_node_type,$child_nid,$child_vid) {//discard
   if($child_node_type=='multichoice') {
     return "
-      d551f0 41ad762e2c0def9a3df
-010b3ed551f0341a
+      SELECT question_nid,question_vid,id,answer
       FROM {quiz_multichoice_answers} 
       WHERE question_nid = ".$child_nid." 
-      514 891c852b0e9d 2 62f358e
-2a3416 1
+      AND question_vid = ".$child_vid." 
       ORDER BY id ASC
       ;
-    b15
+    ";
   }else if($child_node_type=='matching') {
     return "
-      11e328 9e4e348aae7ed6f4981
-6431d811e328f
+      SELECT nid,vid,match_id,question,answer
       FROM {quiz_matching_node} 
       WHERE nid = ".$child_nid." 
-      13c f24 e 310c2e38dc9c8d 2
+      AND vid = ".$child_vid." 
       ORDER BY match_id ASC
       ;
-    fde
+    ";
   }  
 }
-2
+
 /*
 UPDATE BOTH QUESTION TYPES FOR NOT PULLING FROM WCDS TABLES,
-f2af1d5 facca7a d1ca 836 ed539 d
-f2 f1d 7fa ca7a6d1 aa836aed
+INSTEAD PULLING FROM THE TABLE THAT HAS THE CURRENT VERSION
 OF THE QUESTION TYPES ANSWERS:
 
-d6d815a5b8164869f3db6d5c0 8f612b
-d6d81  5b8164869f3db
+{quiz_multichoice_answers question_nid  question_vid
 quiz_matching_node
 
-a015 085 d2 64 281 e95c243 607a 
-a0 56 858 2164 2815e95
+THEN SEE IF IT HAS ALREADY BEEN SET IN THE WCDS TABLES
 */
 function wcds_quizroute_multichoice_query_wcds_answers($question_node,$quiz_nid,$quiz_vid,$prev_child_nid,$prev_child_vid,$prev_child_weight) {
-  dc 4 5
+  $q = 
   "
   SELECT ma.*,r.body 
-  bf8b  0c6092689b674fd6c7aba042
-c bf b
+  FROM  {quiz_multichoice_answers} ma 
   INNER JOIN  {quiz_node_relationship} nr ON nr.child_nid=ma.question_nid 
   LEFT JOIN {node_revisions} r on r.nid =ma.question_nid 
-  736fd f4cbccadf04cb 3 6dbe3d34
-6b736
+  WHERE nr.parent_nid = ".$quiz_nid."
   AND nr.parent_vid = ".$quiz_vid."
-  AND r.nid = ".$prev_child_nid."
-  f08 2c446 a bfb12cec6e97c3c3a0
-9
-  AND ma.question_nid = ".$prev_child_nid."
-  AND ma.question_vid= ".$prev_child_vid."
-  ca31f db 347cc9
-  ";
-  //echo $q;
-  824bc0 3f0a
-}
-function wcds_quizroute_matching_query_wcds_answers($question_node,$quiz_nid,$quiz_vid,$prev_child_nid,$prev_child_vid,$prev_child_weight) {
-  42 5 6
-  "
-  SELECT qmn.*,r.body 
-  4fec af0ee392d75af37f4c1e bdfa
-  INNER JOIN  {quiz_node_relationship} nr ON nr.child_nid=qmn.nid 
-  LEFT JOIN {node_revisions} r on r.nid = qmn.nid 
-  c191b c1fe66cff45f1 0 b1a31fb5
-02c19
-  AND nr.parent_vid = ".$quiz_vid."
-  AND qmn.nid = ".$prev_child_nid."
-  8a0 329800f 3 9979c7df846546a1
-fe8
   AND r.nid = ".$prev_child_nid."
   AND r.vid = ".$prev_child_vid."
-  154 ee75e0b b 2d1d4d0b31f294a0
-081
-  AND qmn.vid = ".$prev_child_vid."
-  ORDER BY qmn.match_id
-  a3f
+  AND ma.question_nid = ".$prev_child_nid."
+  AND ma.question_vid= ".$prev_child_vid."
+  ORDER BY ma.id
+  ";
   //echo $q;
   return $q;
-2c
+}
+function wcds_quizroute_matching_query_wcds_answers($question_node,$quiz_nid,$quiz_vid,$prev_child_nid,$prev_child_vid,$prev_child_weight) {
+  $q = 
+  "
+  SELECT qmn.*,r.body 
+  FROM {quiz_matching_node} qmn
+  INNER JOIN  {quiz_node_relationship} nr ON nr.child_nid=qmn.nid 
+  LEFT JOIN {node_revisions} r on r.nid = qmn.nid 
+  WHERE nr.parent_nid = ".$quiz_nid."
+  AND nr.parent_vid = ".$quiz_vid."
+  AND qmn.nid = ".$prev_child_nid."
+  AND qmn.vid = ".$prev_child_vid."
+  AND r.nid = ".$prev_child_nid."
+  AND r.vid = ".$prev_child_vid."
+  AND qmn.nid = ".$prev_child_nid."
+  AND qmn.vid = ".$prev_child_vid."
+  ORDER BY qmn.match_id
+  ";
+  //echo $q;
+  return $q;
+}
 
 function wcds_quizroute_insert($node) {//discard
-  ce3bf5 0bbbe45 78ce8e1 c09 0e6
- 0ce3bf510
+  //loop through parents for this question
   $q = wcds_quizroute_query_child2parents($node->nid,$node->vid);
   $r = db_query($q);
-  4d27537044 b bb09671ec0667424e
-2f d     0
+  while($obj = db_fetch_object($r)) {     
     //get all previous questions to before this question in this quiz by weight
     $q_prev = wcds_quizroute_query_child2previouschildren($obj->parent_nid,$obj->parent_vid,$node->nid,$node->vid);
-    bc8c1d7 e 11888d727307b3e233
-
+    $r_prev = db_query($q_prev);
     while($obj_prev = db_fetch_object($r_prev)) {      
       //get all answers to previous questions befor this question
-      53d0ab 6 d6dca8adbddf182c4
-af05b053d0ab66ad6dca8adbddf182c4
-af05b053d0ab66ad6dca8adbddf182c4
-af05b053d0 b
+      $q_ans = wcds_quizroute_query_child2answers($obj_prev->type,$obj_prev->child_nid,$obj_prev->child_vid); 
       //condition since $q_ans function is called once without a return value(unknown)
       if(trim($q_ans)=="") continue;
-      fe2167 cf356898a2b5aebc1b4
-61e836
+      //echo "<br/><br/>#-<br/><br/>";
       $r_ans = db_query($q_ans);
       while($obj_ans = db_fetch_object($r_ans)) {
-        fad70 c0 3a70 0d5f8f 438 5d13040 fa 70e 0e3a70a d5f f2438
-5d 30409fad7 ec e3a 0a0d5f8f
+        //add to wcds table, SET DEFAULT TO NOT REQUIRE ANY PREVIOUS QUESTIONS IF NOT CHECKED
         //if checkbox is not set
         if($obj_prev->type=='multichoice') {
-          d37 1a664ed3c79aa4073a
-47885750f7d37f1a664ed3c79aa4073a
-47885750f7d37f1a664ed3c7
+          if( isset($_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid])&&
              $_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid]==1) {
             $is_required = $_SESSION["wcds"]["wcds_".$obj_ans->id."_".$obj_ans->question_nid];
-            58c245 c8 6f8cb057df
-e18        b
-          }else {
-            $is_required = 0;
-          f4
-          $this_obj_ans_id = $obj_ans->id.",";
-          $this_obj_ans_id_col = "answer_id,";
-          666464def1e01bfe274 e 
-9df
-          $question_value = "";
-        }else if($obj_prev->type=='matching') {
-          5a55f5a76d954c 2 44716
-64ba011c005a55f5a76d
-          if( isset($_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid])&&
-             $_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid]==1) {
-            b8abeb3eb390 e 8d4c3
-00342124fc93b8abeb3eb3902e98d4c3
-00342124fc93b8abeb3eb3902e
             //same as is_required==1        
           }else {
-            d34789b577d3 0 3e0
+            $is_required = 0;
+          }
+          $this_obj_ans_id = $obj_ans->id.",";
+          $this_obj_ans_id_col = "answer_id,";
+          $question_value_col = "";
+          $question_value = "";
+        }else if($obj_prev->type=='matching') {
+          $prev_ans_node = node_load($obj_ans->nid);
+          if( isset($_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid])&&
+             $_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid]==1) {
+            $is_required = $_SESSION["wcds"]["wcds_".$obj_ans->match_id."_".$obj_ans->nid];
+            //same as is_required==1        
+          }else {
+            $is_required = 0;
           }
           $this_obj_ans_id_col = "match_id,";
-          8e810806f8e0d068b0e 0 
-4948261ff78e810806
+          $question_value_col = "question_value,";
           $this_obj_ans_id = $obj_ans->match_id.",";
           $question_value = "'".$obj_ans->question."',";
-        67
+        }
         $q_insert = "
         INSERT INTO {wcds_quizroute_".$obj_prev->type."} 
-        7f813dc56c4f1ec954e3
+        (quiz_nid,quiz_vid,
         question_nid,question_vid,
         previous_question_nid,previous_question_vid,".
-        b61f0cf904964a9f08153
+        $question_value_col.
         $this_obj_ans_id_col.
         "answer_value,
-        f030f26d37b08316d7b557bf
-cfc6b6
+        is_required_previous_question)
         VALUES(".$obj->parent_nid.",".$obj->parent_vid.",
         ".$node->nid.",".$node->vid.",
-        2aafebc543123a5d4715ebec
-4f9b36832aafebc543123a5d4715
+        ".$obj_prev->child_nid.",".$obj_prev->child_vid.",".
         $question_value.
         $this_obj_ans_id.
-        7cfe714fb8c774bd44e80116
-
+        "'".$obj_ans->answer."',
         ".$is_required.")
         ;
-        f5    c
+        ";    
         //drupal_set_message($q_insert);
         db_query($q_insert);
-      91
+      }
     }
   }
-  bc0402d88ffe76cc4e95987fe45
+  $_SESSION["wcds"]=array();
 }
 
-f2b1e 68a67aa9 0629 b2 4169b0
+//for deleting only on edits
 function wcds_quizroute_delete($node) {//discard
   //loop through parents for this question
-  0f 4 4c03c0343cfb35929ea62c448
-a50fa454c03c0343cfb35929ea62c448
-
+  $q = wcds_quizroute_query_child2parents($node->nid,$node->vid);
   $r = db_query($q);
   while($obj = db_fetch_object($r)) {
-    88984 d12 88559f7b 5712d9fd6 3e 088984 d129 8559f7bb 71 d9fd 
-3e6 88 848d129
+    //get all previous questions to before this question in this quiz by weight
     $q_prev = wcds_quizroute_query_child2previouschildren($obj->parent_nid,$obj->parent_vid,$node->nid,$node->vid);
     $r_prev = db_query($q_prev);
-    d49d96bbd0d646b 0 e5ae16b5c9
-3ce9d49d96bbd0 64
+    while($obj_prev = db_fetch_object($r_prev)) {
       if(in_array($obj_prev->type,wcds_quizroute_routable_question_types())) {
         //delete by previous and current question FOR ALL REVISIONS
-        fadb907c3 b 9e
+        $q_delete = "
         DELETE FROM {wcds_quizroute_".$obj_prev->type."} 
         WHERE 
-        0899ea88774b8c85a384b559
-c00 c22 0899ea88774b8c85a384b559
-c00 c22  8
+        (question_nid=".$node->nid." AND question_vid=".$node->vid.") AND  
         (previous_question_nid=".$obj_prev->child_nid." AND previous_question_vid=".$obj_prev->child_vid.") 
         ;
-        bb      0
+        ";      
         //drupal_set_message($q_delete);
         db_query($q_delete);
-      e6
+      }
     }
   }
-e4
+}
 
 function wcds_quizroute_update($node) {//discard
-  be892d94a0901fc1d6adb0ad4b7fd4
+  wcds_quizroute_delete($node);
   wcds_quizroute_insert($node);
 }
-a
+
 function wcds_quizroute_takequiz($node) {
   $quiz = $_SESSION["this_quiz_node"];
-5
+
   global $user;
   if($_SESSION[skip_bool]==1) {
-    251cdb889c6eabac55d1bc60
+    $_SESSION[skip_bool]=0;
     unset($_SESSION[skip_bool]);
     return ;
-  88
+  }
   //condition for taking test
   if(isset($_SESSION["this_quiz_node"])&&$_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"]) {
-    d535c53960e03cbc5be8837da33a
-20f2d535c53960e03cb 5b 8837da33a
-20f2d535c53960e03c c5
+    foreach(wcds_quizroute_routable_question_types() AS $k=>$routable_question_name) {
 
       //No checkboxes checked == all checkboxes checked.
-      f296450 3d 921d7 fc 13 00a
-8 d38 f2964506 d2921d73 c6 3500 
-8ad38 f2 645063d2 21d73
+      //check if there is at least one checkbox checked, if none return or continue loop
       $q_wcds = "
       SELECT COUNT(*) cnt 
-      2921 08937a7fbaacf0207958e
-8467332921408937a7fbaa f
-      WHERE question_nid = ".$node->nid."
-      AND quiz_nid = ".$_SESSION['this_quiz_node']->nid."
-      a98
-      $r_wcds = db_query($q_wcds);
-      $obj_wcds = db_fetch_object($r_wcds);
-      ba02f70284eaff1ee 57 8e bf
-6e3704b
-
-
-4
-
-
-0
-
-
-4
-      //no version numbers in this query
-      $q_wcds = "
-      ef29b3 4 0
       FROM {wcds_quizroute_".$routable_question_name."} 
       WHERE question_nid = ".$node->nid."
-      975 7ebab15b f e1a40c78fdd
-77f49697527ebab15b7f4e1a4
+      AND quiz_nid = ".$_SESSION['this_quiz_node']->nid."
       ";
       $r_wcds = db_query($q_wcds);
-      e553bf5cdb8d0b398f7a918553
-4a5726e553bf5cdb8d0b398f7a918553
-4a5726e553bf5cdb8
+      $obj_wcds = db_fetch_object($r_wcds);
+      if($obj_wcds->cnt == 0) continue;
+
+
+
+
+
+
+
+
+
+      //no version numbers in this query
+      $q_wcds = "
+      SELECT * 
+      FROM {wcds_quizroute_".$routable_question_name."} 
+      WHERE question_nid = ".$node->nid."
+      AND quiz_nid = ".$_SESSION['this_quiz_node']->nid."
+      ";
+      $r_wcds = db_query($q_wcds);
+      //print_r($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"]);
       //print_r($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]);          
       $this_result_id = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["result_id"];                    
-      79ea3d 35e5535 0d3 db87ebd b16 5379ea d535e55 5d0d3e
+      //loop through all results and verify answers align
       //if they dont align, skip over this question, compare to quiz user results tables
       $skip = 0;
-      9c7b0fd e 10c0a2358c0a890c
-
+      $in_str = "'placeholder'";
       $answer_id_str = array();
       while($obj_wcds = db_fetch_object($r_wcds)) {  
-        0145c7fc e3 cf6fa8 a1 b0
-4a3 c2f40
+        //create IN string of answer ids,
         //checks for 1 or more than 1 answer id routed
         if($obj_wcds->is_required_previous_question == 1) {
-          f4c7b 3530 9c7a 10 5d4
-191b e6d4bf4c7b
+          //get node type of previous questions
           $prev_node = node_load($obj_wcds->previous_question_nid);
 
-          9bf881086 02 3aa2bf7f8
-488d801b2c9bf881
+          //$in_str .= ",".$obj_wcds->answer_id;
           //for 1 question
           //select where answer id from wcds aligns with in string from results_answers table
-          22409 08d8f75 c9b2b bd
-e 579 60a7 2409 08d f75 c9b2b2bd
- 55 9460 7224
+          //use results table only for quiz node and uid verifying in wcds and
           if($prev_node->type=='multichoice') {
             $q_results_answers = "
-            585031 ebe3027b 82 a
-9 3
+            SELECT COUNT(*) AS cnt 
             FROM {quiz_multichoice_user_answer_multi} uam
             INNER JOIN {quiz_multichoice_answers} a ON a.id=uam.answer_id
-            7c8e4 d575 74ac55e6c
-dcc0a0024fe67c8e42d57 a7 ac 5e6c
-dcc0a0024fe67c8e42d5
+            INNER JOIN {quiz_multichoice_user_answers} ua ON ua.id=uam.user_answer_id
             INNER JOIN {quiz_node_results_answers} ra ON ra.result_id=ua.result_id
             INNER JOIN {quiz_node_results} r ON r.result_id=ua.result_id
-            a77e7 cb7dd0acf59fd 
-3 9eb4da098ea77e7ccb7dd0acf5 f
+            WHERE uam.answer_id IN (".$obj_wcds->answer_id.") 
             AND r.uid=".$user->uid."
             AND ra.result_id=".$this_result_id."
-            6e           8
+            ";           
           }else if($prev_node->type=='matching') {
             $q_results_answers = "
-            2e931a 0387c66a 5c 5
-e a
+            SELECT COUNT(*) AS cnt 
             FROM {quiz_matching_user_answers} ua
             INNER JOIN {quiz_matching_node} mn ON mn.match_id=ua.match_id
-            62fe3 d9e3 29f86bfdc
-9edc3457157362fe3 d9 31 9f86bfdc
-9edc3457157362fe3
+            INNER JOIN {quiz_node_results_answers} ra ON ra.result_id=ua.result_id
             INNER JOIN {quiz_node_results} r ON r.result_id=ua.result_id
             WHERE ua.match_id IN (".$obj_wcds->match_id.") 
-            d75 f7087c260 2c 5a4
-6429bb862d57d756f7087               9
+            AND ua.answer IN (".$obj_wcds->match_id.")               
             AND r.uid=".$user->uid."
             AND ra.result_id=".$this_result_id."
-            2f 6
+            "; 
           }  
 
-          3c70a57a9393166939 e 4
-ea034885913c70a57a9393166939
+          $r_results_answers = db_query($q_results_answers);
           $obj_results_answers = db_fetch_object($r_results_answers);
           if($obj_results_answers->cnt<1) {
-            41ebef4fb
+            $skip=1;
             break;
           }
-        d8
-      }
-
-      85db3a9f3e8c086942f010d 5 
-
-        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["previous_quiz_questions"];
-
-      e35c99fbde184921dc49c146b8
-20d185e35c9
-      //drupal_set_message("FORMERQUESTIONARRAYSIZE::".sizeof($former_question_arrays));
-
-      93263caaa70279a5b91259f867
-e5fd0693263caaa7027 a5
-        // Load the last asked question.
-        $former_question_array = array_shift($former_question_arrays);
-5
-        $former_question = node_load($former_question_array['nid'], 
-          $former_question_array['vid']);
-c
-        //see quiz.module line 1814
-        // Advance the question.
-        94455f9ef01a1d58c0e294d1
-d38facbe94455f9ef01a1d58c0e294d1
-d38facbe94455f9ef01a1d 8 0e294d1
-d38facbe94455f9ef01a1d58c0e294d1
-d38facbe94455f9ef01a1d58c0e294d1
-
-
-        // Load the last asked question.
-        d4b560a7e3ca669f610fea e d92b4d6ad4b560a7e3ca669f610fea2e
-d92b4d6ad4b560a7e3ca669f610fea2e
-d92b4d6ad4b560a7e3
-        $former_question = node_load($former_question_array['nid'], $former_question_array['vid']);
-        // Call hook_skip_question().
-        53c4972 a 63739c4feb2ae7
-afc2f15b53c49721a863739c4feb2ae7
-afc2f15
-        if (!$module) return array('body' => array('#value' => ' '));
-        $result = module_invoke($module, 'skip_question', $former_question, 
-        3c65e273dce75ce586049304
-1d6f61233c65e273dce75ce586049304
-1d6f61233
-        // Store that the question was skipped:
-        $quiz = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid];
-        cdfa0a51b819b708664d18ac
-db349f67 dfa0a51b 19b708664d18ac
- b3 9f67c f
-        'question_data' => $former_question_array));
-        $url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
-        9f3145483f2367a70b151854
-3bd4931a
- 
-//DEPRECATED FROM HERE TO END OF BLOCK
-97c
-$_SESSION[skip_bool]=1;
-$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
-69813c4152f51eac8 de0b5c543048e3
-69813c41
-
-if(arg(3)=='skip') {
-  7391de d1bea773d6544e34a4f0b09
-8
-exit;
-}
-0
-//SEE IF YOU CAN FIND A WAY TO SEND IT TO THE NEXT UNSKIPPED QUESTION
-//BEFORE THE PAGE LOADS: QUIZ DOESNT KNOW IT HAS BEEN SKIPPED AT THIS POINT
-52f
-$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI]."/skip";
-$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
-ff7c1e 87a16db4de3e8f919d27
-//ACTUALLY YOU WILL WANT TO PUT THIS IN THE PREPROCESS FUNCTION?  PUTTING IT HERE IS AN INFINITE REDIRECT
-//or use a key skip=1 to only reload once
-6fc607a77ed668aaf 6a19b057aa3691
-6fc607a7
-exit;
-//header("Location: http://www.google.com");
-562
-//print_r ($_SESSION['quiz_'. $quiz->nid]['quiz_questions'] ) ;
-//echo "<br/>";
-8b5d53ba2 7a6e106f0efce205eda 2a
-8b5d53ba2d7a6e106f0efce205edab2a
-8b5 53
-//echo "<br/>";
-
-a6b5e2       820d70cdeada8c5638 
-a6b5e2fc83422820d70cdeada8c56 8c
-//echo "<br/>";
-//echo $_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid];
-a34042 5f8fc6917
-
-//$last_array_prev_questions = array();
-86b40a2be3727b05a8bd2d54ff7e0 fd
-86b40a2be3727b05a8bd2d54ff7e03fd
-86b4 a2be3727b05a8bd2d54ff7e03f 
- 6b40a2be3727b05a8bd2d5 ff7e03fd
-86b40a2be3727b05a8bd2d54ff7e03fd
-
-//drupal_set_message($_POST[op]);
-e99ea36a120 a a38a45dc59a87 9 62
-/*
-if($_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid]!=$last_array[nid])
-a9167e
-*/
-/*
-fdd89bd4d2e898aea4c13 44786f26b0
-fdd89bd4d2e898aea4c13244786f26b0
-fdd89bd4d2e8 8a
-  drupal_set_message($_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid].",".$last_array[nid]);
-
-  916008c8b482490fd5b112 2b462bd
-24916008c8b4824
-
-}
-205
-/*
-        //avoid reloading on page results after completing quiz
-        67 a 27034a 00 b49003088
- d4deeaa6
-        drupal_set_html_head('<meta http-equiv="refresh" content="0" />');
-*/
-      7     a
-    }
-  }
-b
-  if(isset($_SESSION["this_quiz_node"])) {
-    unset($_SESSION["this_quiz_node"]);
-  84
-}
-
-2
-function wcds_quizroute_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
-  if(!isset($node->nid)) return;
-9
-  //avoid reloading on page results after completing quiz
-  if ( arg(2) == 'results') return;
-c
-  //quiz form on question edit form (for adding and removing questions from quiz)
-  if(arg(2)=='questions'&&$node->type=='quiz') {
-    3f4b39 b0225 8c
-      case t('insert'):  
-      break;
-    0  5
-  }
-
-  d7 1 7a7cf735755 d4 356a4c8 d6
-    //remove from and add question to quiz without deleting?  move question to another quiz?  
-    //same question on multiple quizes
-    f56647d2af311e8fd0b87fd a062
-f1d
-    $_SESSION["this_quiz_node"]=$node;//for use in wcds table for storing
-  }
-6
-  if( in_array($node->type,wcds_quizroute_question_types()) && $node->type!='quiz') {
-    switch ($op) {
-      5168 7c6207e451d5   1
-        wcds_quizroute_insert($node);
-        //render checkboxes with default values
-        2cfbd8        d
-      case t('delete revision'):   
-        wcds_quizroute_delete($node);
-        148b37        6
-      case t('delete'):   
-        wcds_quizroute_delete($node);
-        080c87        d
-      case t('update'):   
-        wcds_quizroute_update($node);
-        0875c92b 27273fcc60 875a 06f493e 0875c92
-        //update wcds by answer id for changes to answer and changes 
-        //to revision of quiz and question
-        6592 b6d a8 ceb198 cdbdd
-5e278e75
-        //delete in the same way as 'delete'
-        //insert in the same way as insert
-        33d8dc        6
-      case t('view'):   
-        wcds_quizroute_takequiz($node);
-        89cd2b        1
-      case t('prepare'):   
-        break;        
-    53
-  }
-}
-3
-function wcds_quizroute_question_types() {
-  return array('multichoice','matching','truefalse','short_answer','long_answer','scale','direction');
-c1
-function wcds_quizroute_routable_question_types() {
-  //return array('multichoice','matching','truefalse');
-  9f0ebb c297ca85c1a005532ed206d
-359f0ebb0
-}
-
-1d72
- * Implements hook_form_alter()
- * 
- f 215 b249 0f617802 7b 42c11 10
-9 221 cb24 f0f6 780247
- * 
- * @param $form
- e   5ab1 a30017b18
- * 
- * @param $form_state
- f   3680 3b130a5
- * 
- * @param $form_id
- 2   be0e 5dd
- * 
- */
-650cb8a7 9c3753271aa424919d03e83
-650cb8a7 9c3753271aa4 4919d03e8 
-    b
-  $node = node_load(arg(1));
-  if( in_array($form['#node']->type,wcds_quizroute_question_types()) && $form['#node']->type!='quiz') 
-  21
-    $function_query_quizzes =  "wcds_quizroute_query_quizzes";
-    //echo $function_query_quizzes();
-    e298622298 0 87f4fa9872d212e
-791be29862229820d87f   9
-    while($obj_quizzes = db_fetch_object($r_quizzes)) {
-     /*only show checkbox fieldsets for quizzes on edit form, not add form*/
-     30c3c93371e4117658921a5aa21
-f0d1730c3c93371e4117658921a5aa21
-f d1
-        continue;
-     }
-      0b 9862 a0e617b8 81f8244f 
-5fe 0c ba98 24a0e617 82 1f824 f7 5fe 0c0ba986 4a0 617 8281f  44f7 5fe90c0 a98624 0e617b828 f824 f7
- fe90c0b 986 4a0e617b 281f8244f7
-5
-      if(!in_array($obj_quizzes->nid."-".$obj_quizzes->vid,$form["add_directly"]["already"]["#default_value"])) {
-        continue;
-      de
-      $quiz_key = "wcds_quiz_".$obj_quizzes->nid;
-      $quiz_key = $obj_quizzes->nid;
-4
-
-      $function_query_questions = "wcds_quizroute_query_questions";
-      b62d8935920b 9 ae50dbed2ad
-67b8dfb62d8935920bc9cae50dbed2ad
-67b8dfb62d8935920bc9cae50dbed2ad
-6
-      $r_questions = db_query($q_questions);
-
-      e1f8575505a8862322943307 7
-
-            $form["wcds"][$quiz_key] = array(
-              '#type' => 'fieldset',
-              7a2d4583 e0 4205a5
- 6a28 f2338b 97a2d45837e084205a5
-16a2
-              '#collapsible' => TRUE,
-              /*'#collapsed' => TRUE,*/
-              07e26e96fec58 bc e
-5f5add4b1ee 4f 7e26e96fe
-            );
-      }
-f
-
-      while($obj_questions = db_fetch_object($r_questions)) {
-        afe1 43d 2f677a4 d04874d
-ba a37 8afe a43db2f67
-        if($node->nid==$obj_questions->child_nid) continue;
-        $question_key = "wcds_question_".$obj_questions->child_nid;
-        44f7ba1b10dfd b f9a448fa
-68ad559744f7ba1b10
-        /*question as fieldset*/
-        $form["wcds"][$quiz_key][$question_key] = array(
-          3e2d909 a3 3c19715984a
-
-          '#title' => t($obj_questions->teaser),
-          '#description' => t($obj_questions->body),
-          675a286be 20 dd697bbc2
-334729cde9675a286
-          '#collapsible' => TRUE,
-          /*'#collapsed' => True*/
-        6d 6
-
-        foreach(wcds_quizroute_routable_question_types() AS $k=>$routable_question_name) {
-          1f4b8ec9b45cc9 2 e6c3c
-b9c0925e0f1f4b8ec9b45cc9b22e6c3c
-b9c0
-          //if(!module_exists('module_name')) continue;
-          $function_query_wcds_answers = "wcds_quizroute_".$routable_question_name."_query_wcds_answers";
-          5e60bb5a92 4 88651df31
-dac3b1831d5e60bb5a9254a88651df31
-dac3b1831d5e60bb5a9254a88651df31
-dac3b1831d5e60bb5a9254a88651df31
-dac3b1831d5e60bb5a9254a88651df31
-dac3b1831d5e60b
-          $r_answers = db_query($q_answers);
-          $_SESSION["wcds"]=array();//unsetting from any previous
-          e2ad9e16606372fda6 3 5
-cc125b73abe2ad9e16606372fd 61
-            if($routable_question_name=='matching') { 
-              $q_is_required_previous_question = "
-              045431 96f13ba81f9
-86864f2444969f045 31b9 f13ba81f9
-86864f2444969f0 5
-              WHERE question_nid = ".$form['#node']->nid." 
-              AND question_vid = ".$form['#node']->vid. " 
-              a78 a700cb4b67a730
-223d3a e 796fca783a700cb4b67a730
-223d a e
-              AND previous_question_vid = ".$obj_questions->child_vid. " 
-              AND match_id = ".$obj_answers->match_id;
-              dbe738 414b6bd2d11
-2d8bab72620e56dbe73834
-              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
-              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
-              93a20783fb4bb34560 8 ead799d5d76793a20783fb4bb34
-              $answer_key = $obj_answers->match_id;
-              $obj_title_str = $obj_answers->question." >> ".$obj_answers->answer;
-              87c8bb86dcef 0 d47
-44900b2915b5e587c8bb86dcef40cd47
-44900b2
-            }else if($routable_question_name=='multichoice') {
-              $q_is_required_previous_question = "
-              b595b6 6b2b8ab3382
-f77821c1beefffb59 b6c6 2b8ab3382
-f77821c1beefffb595 6
-              WHERE question_nid = ".$form['#node']->nid." 
-              AND question_vid = ".$form['#node']->vid. " 
-              07a 1a2ec9cc75d024
-f3e127 2 b57dc07a31a2ec9cc75d024
-f3e1 7 2
-              AND previous_question_vid = ".$obj_questions->child_vid. " 
-              AND answer_id = ".$obj_answers->id;
-              1a04d6 78ba43a4264
-a16173265256a51a04d667
-              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
-              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
-              fe5f4358b4635815fb e 7bf2e502d31afe5f4358b463581
-              $answer_key = $obj_answers->id;
-              $obj_title_str = $obj_answers->answer;
-              1a50c44542af e 687
-c93636edea5efc1a50c44542affeb687
-c93636e
-            }
-            $form["wcds"][$quiz_key][$question_key][$answer_key] = 
-              d98c811
-                '#type' => 'checkbox',
-                '#title' => t($obj_title_str),
-                fce2d 35 19c1765
-9ecb4428e
-                '#name' => t($answer_name),
-                '#default_value' => t($obj_is_required_previous_question->is_required_previous_question),
-                08a58cfda0608e15
-1 f5 7e182bbea2608a58
-                '#required' => FALSE,
-                /*'#weight' => 1,*/
-              cca
-            //$_SESSION["wcds"][$answer_name]=t($obj_answers->is_required_previous_question);
-            $_SESSION["wcds"][$answer_name]=-1;
-          a3
         }
       }
-    04
-    $form['#validate'][] = 'wcds_quizroute_form_validate';
-    /* call submit handler on this node type form */
-    f0832ac7dba2383a 1 e059b8d74
-4d43f0832ac7dba2383aa12e059b8d74
-4    0
+
+      $former_question_arrays = 
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]["previous_quiz_questions"];
+
+      //drupal_set_message("SKIP::".$skip);
+      //drupal_set_message("FORMERQUESTIONARRAYSIZE::".sizeof($former_question_arrays));
+
+      if($skip>0&&sizeof($former_question_arrays)>0) {
+        // Load the last asked question.
+        $former_question_array = array_shift($former_question_arrays);
+
+        $former_question = node_load($former_question_array['nid'], 
+          $former_question_array['vid']);
+
+        //see quiz.module line 1814
+        // Advance the question.
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['previous_quiz_questions'][] = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['quiz_questions'][0];
+
+        // Load the last asked question.
+        $former_question_array = array_shift($_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['quiz_questions']);
+        $former_question = node_load($former_question_array['nid'], $former_question_array['vid']);
+        // Call hook_skip_question().
+        $module = quiz_question_module_for_type($former_question->type);
+        if (!$module) return array('body' => array('#value' => ' '));
+        $result = module_invoke($module, 'skip_question', $former_question, 
+        $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid]['result_id']);
+        // Store that the question was skipped:
+        $quiz = $_SESSION["quiz_".$_SESSION['this_quiz_node']->nid];
+        quiz_store_question_result($quiz, $result, array('set_msg' => TRUE, 
+        'question_data' => $former_question_array));
+        $url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
+        drupal_goto($url_redirect_skip);
+ 
+//DEPRECATED FROM HERE TO END OF BLOCK
+/*
+$_SESSION[skip_bool]=1;
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
+header("Location: ".$url_redirect_skip);
+
+if(arg(3)=='skip') {
+  //echo arg(3)."++++++++++++++";
+exit;
+}
+
+//SEE IF YOU CAN FIND A WAY TO SEND IT TO THE NEXT UNSKIPPED QUESTION
+//BEFORE THE PAGE LOADS: QUIZ DOESNT KNOW IT HAS BEEN SKIPPED AT THIS POINT
+//
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI]."/skip";
+$url_redirect_skip ="http://".$_SERVER[HTTP_HOST].$_SERVER[REQUEST_URI];
+//echo $url_redirect_skip;
+//ACTUALLY YOU WILL WANT TO PUT THIS IN THE PREPROCESS FUNCTION?  PUTTING IT HERE IS AN INFINITE REDIRECT
+//or use a key skip=1 to only reload once
+header("Location: ".$url_redirect_skip);
+exit;
+//header("Location: http://www.google.com");
+*/
+//print_r ($_SESSION['quiz_'. $quiz->nid]['quiz_questions'] ) ;
+//echo "<br/>";
+//print_r ($_SESSION['quiz_'. $quiz->nid]['previous_quiz_questions']) ;
+//echo "<br/>";
+
+//echo       $_SESSION['quiz_'. $quiz->nid]['question_number'] ;
+//echo "<br/>";
+//echo $_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid];
+//echo "<br/>";
+
+//$last_array_prev_questions = array();
+//if(isset($_SESSION['quiz_'. $quiz->nid]['previous_quiz_questions'])) $last_array_prev_questions = end($_SESSION['quiz_'. $quiz->nid]['previous_quiz_questions']);
+
+//drupal_set_message($_POST[op]);
+//$num_next + $num_previous + 1
+/*
+if($_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid]!=$last_array[nid])
+exit;
+*/
+/*
+if($_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid]!=$last_array[nid]) {
+  drupal_set_message($_SESSION['quiz_'. $quiz->nid]['quiz_questions'][0][nid].",".$last_array[nid]);
+
+  drupal_goto("Location: ".$url_redirect_skip);
+
+}
+*/
+/*
+        //avoid reloading on page results after completing quiz
+        if ( arg(2) == 'results') return;
+        drupal_set_html_head('<meta http-equiv="refresh" content="0" />');
+*/
+      }     
+    }
+  }
+
+  if(isset($_SESSION["this_quiz_node"])) {
+    unset($_SESSION["this_quiz_node"]);
   }
 }
-0
+
+
+function wcds_quizroute_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  if(!isset($node->nid)) return;
+
+  //avoid reloading on page results after completing quiz
+  if ( arg(2) == 'results') return;
+
+  //quiz form on question edit form (for adding and removing questions from quiz)
+  if(arg(2)=='questions'&&$node->type=='quiz') {
+    switch ($op) {
+      case t('insert'):  
+      break;
+    }  
+  }
+
+  if ( $node->type == 'quiz') {
+    //remove from and add question to quiz without deleting?  move question to another quiz?  
+    //same question on multiple quizes
+    if(arg(2)=='questions') return;
+    $_SESSION["this_quiz_node"]=$node;//for use in wcds table for storing
+  }
+
+  if( in_array($node->type,wcds_quizroute_question_types()) && $node->type!='quiz') {
+    switch ($op) {
+      case t('insert'):   
+        wcds_quizroute_insert($node);
+        //render checkboxes with default values
+        break;        
+      case t('delete revision'):   
+        wcds_quizroute_delete($node);
+        break;        
+      case t('delete'):   
+        wcds_quizroute_delete($node);
+        break;        
+      case t('update'):   
+        wcds_quizroute_update($node);
+        //render checkboxes with default values
+        //update wcds by answer id for changes to answer and changes 
+        //to revision of quiz and question
+        //no key so cannot insert-update
+        //delete in the same way as 'delete'
+        //insert in the same way as insert
+        break;        
+      case t('view'):   
+        wcds_quizroute_takequiz($node);
+        break;        
+      case t('prepare'):   
+        break;        
+    }
+  }
+}
+
+function wcds_quizroute_question_types() {
+  return array('multichoice','matching','truefalse','short_answer','long_answer','scale','direction');
+}
+function wcds_quizroute_routable_question_types() {
+  //return array('multichoice','matching','truefalse');
+  return array('multichoice','matching');
+}
+
 /**
- * Implements hook_submit_handler()
- 6 7
- * Extend product edit form submit for including redirect field
+ * Implements hook_form_alter()
  * 
- a 717a7a f6628c
+ * Add form elements to admin form for this node type.
+ * 
+ * @param $form
  *   Form elements
  * 
- 6 4392f8 660f472d82d2
+ * @param $form_state
+ *   Form values
+ * 
+ * @param $form_id
+ *   Form id
+ * 
+ */
+function wcds_quizroute_form_alter($form, $form_state, $form_id) {    
+  $node = node_load(arg(1));
+  if( in_array($form['#node']->type,wcds_quizroute_question_types()) && $form['#node']->type!='quiz') 
+  {
+    $function_query_quizzes =  "wcds_quizroute_query_quizzes";
+    //echo $function_query_quizzes();
+    $r_quizzes = db_query($function_query_quizzes());   
+    while($obj_quizzes = db_fetch_object($r_quizzes)) {
+     /*only show checkbox fieldsets for quizzes on edit form, not add form*/
+     if(!isset($form["add_directly"]["already"]["#default_value"])) {
+        continue;
+     }
+      /* show checkbox fieldset only if this question is added to the fieldset for the quiz.  This implies adding questions will not include any checkbox fieldsets*/
+      if(!in_array($obj_quizzes->nid."-".$obj_quizzes->vid,$form["add_directly"]["already"]["#default_value"])) {
+        continue;
+      }
+      $quiz_key = "wcds_quiz_".$obj_quizzes->nid;
+      $quiz_key = $obj_quizzes->nid;
+
+
+      $function_query_questions = "wcds_quizroute_query_questions";
+      $q_questions = $function_query_questions($form['#node'],$obj_quizzes->nid,$obj_quizzes->vid);
+      $r_questions = db_query($q_questions);
+
+      if(db_affected_rows()>0) {
+            $form["wcds"][$quiz_key] = array(
+              '#type' => 'fieldset',
+              '#title' => t('WCDS Quiz Route: '.$obj_quizzes->title),
+              '#collapsible' => TRUE,
+              /*'#collapsed' => TRUE,*/
+              '#attributes' => array('class' => 'wcds'),
+            );
+      }
+
+
+      while($obj_questions = db_fetch_object($r_questions)) {
+        //do not include checkboxes for this question
+        if($node->nid==$obj_questions->child_nid) continue;
+        $question_key = "wcds_question_".$obj_questions->child_nid;
+        $question_key = $obj_questions->child_nid;
+        /*question as fieldset*/
+        $form["wcds"][$quiz_key][$question_key] = array(
+          '#type' => 'fieldset',
+          '#title' => t($obj_questions->teaser),
+          '#description' => t($obj_questions->body),
+          '#weight' => t($obj_questions->weight),
+          '#collapsible' => TRUE,
+          /*'#collapsed' => True*/
+        ); 
+
+        foreach(wcds_quizroute_routable_question_types() AS $k=>$routable_question_name) {
+          //$module_name = "wcds_quizroute_".$routable_question_name;
+          //if(!module_exists('module_name')) continue;
+          $function_query_wcds_answers = "wcds_quizroute_".$routable_question_name."_query_wcds_answers";
+          $q_answers = $function_query_wcds_answers($form['#node'],$obj_quizzes->nid,$obj_quizzes->vid,$obj_questions->child_nid,$obj_questions->child_vid,$obj_questions->weight);
+          $r_answers = db_query($q_answers);
+          $_SESSION["wcds"]=array();//unsetting from any previous
+          while($obj_answers = db_fetch_object($r_answers)) {
+            if($routable_question_name=='matching') { 
+              $q_is_required_previous_question = "
+              SELECT is_required_previous_question FROM {wcds_quizroute_matching} 
+              WHERE question_nid = ".$form['#node']->nid." 
+              AND question_vid = ".$form['#node']->vid. " 
+              AND previous_question_nid = ".$obj_questions->child_nid. " 
+              AND previous_question_vid = ".$obj_questions->child_vid. " 
+              AND match_id = ".$obj_answers->match_id;
+              //echo $q_is_required_previous_question;
+              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
+              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
+              $prev_question_key = $obj_questions->child_nid;
+              $answer_key = $obj_answers->match_id;
+              $obj_title_str = $obj_answers->question." >> ".$obj_answers->answer;
+              $answer_name = "wcds_".$answer_key."_".$prev_question_key;
+            }else if($routable_question_name=='multichoice') {
+              $q_is_required_previous_question = "
+              SELECT is_required_previous_question FROM {wcds_quizroute_multichoice} 
+              WHERE question_nid = ".$form['#node']->nid." 
+              AND question_vid = ".$form['#node']->vid. " 
+              AND previous_question_nid = ".$obj_questions->child_nid. " 
+              AND previous_question_vid = ".$obj_questions->child_vid. " 
+              AND answer_id = ".$obj_answers->id;
+              //echo $q_is_required_previous_question;
+              $r_is_required_previous_question = db_query( $q_is_required_previous_question);
+              $obj_is_required_previous_question = db_fetch_object( $r_is_required_previous_question);
+              $prev_question_key = $obj_questions->child_nid;
+              $answer_key = $obj_answers->id;
+              $obj_title_str = $obj_answers->answer;
+              $answer_name = "wcds_".$answer_key."_".$prev_question_key;
+            }
+            $form["wcds"][$quiz_key][$question_key][$answer_key] = 
+              array(
+                '#type' => 'checkbox',
+                '#title' => t($obj_title_str),
+                '#id' => t($answer_name),
+                '#name' => t($answer_name),
+                '#default_value' => t($obj_is_required_previous_question->is_required_previous_question),
+                /*'#default_value' => t('checked'),*/
+                '#required' => FALSE,
+                /*'#weight' => 1,*/
+              );
+            //$_SESSION["wcds"][$answer_name]=t($obj_answers->is_required_previous_question);
+            $_SESSION["wcds"][$answer_name]=-1;
+          }
+        }
+      }
+    }
+    $form['#validate'][] = 'wcds_quizroute_form_validate';
+    /* call submit handler on this node type form */
+    $form['#submit'] = array('wcds_quizroute_form_submit_handler');    
+  }
+}
+
+/**
+ * Implements hook_submit_handler()
+ * 
+ * Extend product edit form submit for including redirect field
+ * 
+ * @param $form
+ *   Form elements
+ * 
+ * @param $form_state
  *   Form values
  */
-5cd287db 2ee7f953e35a970287099cf
-5cd287db32ee7f953 35a970287099c 
-5
+function wcds_quizroute_form_submit_handler($form, &$form_state) {
   //update session answers with what users changed on form
   foreach($form_state["clicked_button"]["#post"] AS $k=>$v) {
-    fc156b5c381d7eda5c255046213b 3    c
+    if(preg_match("/wcds/i",$k)) {    
       //echo $k."=".$v."<br/>";
       $_SESSION["wcds"][$k]=$v;
-    94
+    }
   }  
 }
-1
 
 
-f
+
+
 function wcds_quizroute_preprocess_page(&$variables) {
   // suppress messages only when completing test taking
-  fa9
+  /*
   if(arg(2) == 'take') return;
     $variables["messages"]=null;
-    dc3
+    */
 }
+
