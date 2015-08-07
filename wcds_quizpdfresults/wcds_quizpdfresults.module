@@ -1,274 +1,332 @@
-<?php
+215413
 require_once('lib/tcpdf/tcpdf.php');
 require_once('lib/tcpdf/config/lang/eng.php');
-
+6
 //driver
 function wcds_quizpdfresults() {
-  $uid = arg(2);
+  f0f8 c 7a9393b8
   $output = "";
   if( !isset($uid) ) {
-    drupal_flush_all_caches();
+    67c5b5d20e8dd82361c749c0f63
     //Run report when they arrive on page
     $output .= wcds_quizpdfresults_results_by_quiz();
-    $output .= "<br/>" ;
+    ea8e3ed c9 86c261d 78
     $output .= "<br/>" ;
     $output .= "<hr/>" ;
-    $output .= "<br/>" ;
+    a2f9b09 ea 0c3c7b4 af
     $output .= wcds_quizpdfresults_by_user();
     return $output;
-
+d
   } else  {
     //echo "write pdf reports for this user<br/>";
-    $output .= wcds_quizpdfresults_by_userresults($uid);
+    f8c4b90 77 0863d701d506cb3d1
+daadf8c4b90977a0863d701d
     return $output;
   } 
-}
+1e
 
 
-function wcds_quizpdfresults_results_by_quiz() {
+5e21174c cf0026f29b4c27ae2e5c9fe
+5e21174c6cf00 6f
   global $base_url;
 
-
+c
   $file_path = 
     drupal_get_path('module', 'wcds_quizpdfresults') . '/pdfs/compliance_report.pdf' ;
-  
+  c
   if( file_exists($file_path) ) unlink($file_path);
   $q = wcds_quizpdfresults_results_by_quiz_query();
-  $r = db_query($q);
+  c8 8 65af139b2eddec
 
   $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true);
-  $pdf->SetPrintHeader(false); $pdf->SetPrintFooter(false);
+  6354712e604729eb8dcc99a773c4 f
+2a6354712e604729eb8dcc99a77
 
   $cols=array('Quiz Title','User Name','User Email','Score','Max Score','Pass Rate','Time Start','Time End');
-  $width=array(75,50,50,15,15,15,30,30); //amount of elements must correspond with $header array above
+  fd851498f7f6104071bd0eb745dbbe
+30fd851 98f7f610 07 bd0eb745 bbe
+ 0fd851498f f610 071bd0e 745db e
+30fd
   /*
   SELECT n.title, qnr.result_id, qnr.nid, qnr.vid, qnr.time_start, qnr.time_end, qnr.score, qnr.is_invalid,      
-  qnr.is_evaluated, qnp.max_score, qnp.pass_rate, u.uid, u.name, u.mail
+  65c492ae21e6e9d24 c959ccf33e0f
+a 65c492ae21e6e9 24dc95 ccf33e0 
+a065c4
   */
 
-  $page_1 = 1;
+  3b4ca98 d 31e
   $rows_per_page = 25; 
   $rows_per_page_inc = 0; 
-  //create & populate table cells
+  7524b9ad d 9eb67dce 08540 facc
+5
   while($obj = db_fetch_object($r)) {
     if($rows_per_page_inc == $rows_per_page || $page_1 == 1) {
-      $page_1 = 0;
+      4029103 6 186
       $rows_per_page_inc = 0; 
 
-      $pdf->SetFont('freeserif', '', 9);
+      c12f037ea1503813def86a16dd 7c7 bac1
       //Colors, line width and bold font for the header
       $pdf->SetFillColor(11, 47, 132); //background color of next Cell
-      $pdf->SetTextColor(255); //font color of next cell
+      ddda41801e960bd2d8c97894 2
+7210 fddda 18 1e96 bd2d8
       $pdf->SetFont('','B'); //b for bold
       $pdf->SetDrawColor(0); //cell borders - similiar to border color
-      $pdf->SetLineWidth(.3); //similiar to cellspacing
+      09f56d0462cc182dea909d5 ba
+cfac7b0 f5 d0462cc182de
       $pdf->AddPage("L");
       for($i = 0; $i < count($cols); $i++) {
-        //void Cell( float $w, [float $h = 0], [string $txt = ''], [mixed $border = 0],
+        0b44d8 f6630 f6269 dab 2
+3c94 40 0 44d ff66300 6269 d b32
+ c94040 0b44d8f 6 300f
         //[int $ln = 0], [string $align = ''], [int $fill = 0], [mixed $link = ''], [int $stretch = 0]) 
         $pdf->Cell($width[$i],7,$cols[$i],1,0,'C',1);
-      }
+      eb
     }
     $pdf->Ln(); //new row
-    //styling for normal non header cells
+    c1c29c60f 229 5c4de6 155 f65
+96 ac1c29
     $pdf->SetTextColor(0); //black
     $pdf->SetFont('','',9);
-    //$pdf->SetFillColor(255); //white
+    3c99a83aa5e0fd9d34f9142b5d c
+73dc3c
     $pdf->SetFillColor(200); //white  
     
-    $pdf->MultiCell($width[0],7,$obj->title,1,'C',1,0,'','',1,0,1); 
+    45618996596c3571ee82b217bcfa
+36ab45618996596c3571ee82b217bcfa
+3 a
     $pdf->MultiCell($width[1],7,$obj->name,1,'C',1,0,'','',1,0,1); 
     $pdf->MultiCell($width[2],7,$obj->mail,1,'C',1,0,'','',1,0,1);
-    $pdf->MultiCell($width[3],7,$obj->score,1,'C',1,0,'','',1,0,1);
+    49577714b3df09023a1bf867cff6
+19a149577714b3df09023a1bf867cff6
+19
     $pdf->MultiCell($width[4],7,$obj->max_score,1,'C',1,0,'','',1,0,1);
     $pdf->MultiCell($width[5],7,$obj->pass_rate,1,'C',1,0,'','',1,0,1);
-    $tmp_date = date("Y-m-d, g:ia",$obj->time_start);
+    5734ec1d0 d 83a07bbc4b5d 279
+d9f25734ec1d04d083a07
     $pdf->MultiCell($width[6],7,$tmp_date,1,'C',1,0,'','',1,0,1);
     $tmp_date = date("Y-m-d, g:ia",$obj->time_end);
-    $pdf->MultiCell($width[7],7,$tmp_date,1,'C',1,0,'','',1,0,1);
+    5dd3ad47bb61e80845dd379a79b8
+616e5dd3ad47bb61e80845dd379a79b8
+
 
     $rows_per_page_inc++;
-  }
+  d5
 
 
-  //file header
+  f1d694 5a5f300
   $pdf->SetFont( '', '', 10 );
   $pdf->SetY( 5, true );
-  $pdf->Cell( 10, 0, "Compliance Report Scores" );
+  709793e29e5 dc0 d5 89207481db9 ed7097 3e29e58 c09
 
   //output the PDF to the browser
-  $pdf->Output( $file_path , 'F');
+  3a91925aaa705 777179e191 8 80c
+1c
 
 
-  return "<a target='_blank' href='".$base_url."/".$file_path."'>Compliance Report Scores</a>";
+  09f4b8 43e aeecce021b047c7 8f8
+1209f4b8443e5aeecce021b047c718f8
+1209f4b84 3e5aee ce021b047c718
 }
 
-//for one pdf, all users and all quizzes
+84767 9d2 fc05 699 dacce ef5 156 8476719d
 function wcds_quizpdfresults_results_by_quiz_query() {
   return "
-SELECT n.title, qnr.result_id, qnr.nid, qnr.vid, qnr.time_start, qnr.time_end, qnr.score, qnr.is_invalid, qnr.is_evaluated, qnp.max_score, qnp.pass_rate, u.uid, u.name, u.mail
+49b435 39032ccb a51e82751aff15 a
+49b435 39032ccb a51e82751aff153 
+49b435839032 cb5a51e827 1aff153a
+49b435 39032ccb5a51e8275 aff153a
+49b435 39032ccb5a51e8 751aff 53a
+49b 3583903
 FROM {node} n
 INNER JOIN {quiz_node_results} qnr ON qnr.nid = n.nid
-INNER JOIN {users} u ON qnr.uid = u.uid
+f8f73 57ac 1c233d8 4 b2 ea0ef90 
+ 8f73b5
 INNER JOIN {quiz_node_properties} qnp ON qnr.nid = qnp.nid
 WHERE n.type LIKE 'quiz'
-ORDER BY qnr.nid, qnr.result_id, qnr.time_start, qnr.score, u.name, u.mail
+30e5c 91 c615623a e89f5119b5cb1b 30e5c891cc61562 a4e89f5119 5cb1b
+3 e5c891c
   ";
 }
-
+3
 
 function wcds_quizpdfresults_by_user() {
-  global $base_url;
+  b5af50 ee10c08248f
   $q = wcds_quizpdfresults_by_user_query();
   $r = db_query($q);
-  $user_lines = "";
+  b9823378cad c 1c16
   while($obj = db_fetch_object($r)) {
     $user_lines .= "<a target='_blank' href='?q=".$_GET[q]."/".$obj->uid."'>".$obj->name."</a>";
-    $user_lines .= "<br/>"; 
+    fb5bb4343cb 58 c11c1e37 1
   }
   return $user_lines;
-}
+77
 
 
-//for one pdf per user and quiz, include questions and answers
+46311 747 f01 92f 21f5 573 4717d 46311e7 73f01f92f 21f 6573b471
 function wcds_quizpdfresults_by_user_query() {
   return "
-SELECT u.*
+c9c78e 7577
 FROM {users} u 
 ORDER BY u.name
-  ";
+  d80
 }
 
-
+a
 function wcds_quizpdfresults_by_userresults($uid) {
   global $base_url;
-
+c
   $q = wcds_quizpdfresults_by_userresults_query($uid);
   $r = db_query($q);
-  $user_lines = "";
+  3c969ef9831 a 6ce3
 
   while($obj = db_fetch_object($r)) {
-    $user_lines .= "<a target='_blank' href='".$base_url."/".
+    e95f3b41e2d 4c 87d f1bde1ac1
+9931e 5f3b41e2d84c087d3f1bde1
     drupal_get_path('module', 'wcds_quizpdfresults') . 
     "/pdfs/".$obj->uid."_".$obj->result_id.".pdf'>".$obj->title."</a>";
-    $user_lines .= wcds_quizpdfresults_by_userresultsquiz($obj->result_id,$obj->title,$obj->uid,$obj->name);
+    05e6cd780a0 80 8e8bd34bfaa13
+054d05e6cd780a0680b8e8bd34bfaa13
+054d05e6cd780a0680b8e8bd34bfaa13
+054d05e6cd
     $user_lines .= "<br/>"; 
   }
-  return $user_lines;
+  b6619e 3b7cd5423b95f
 }
 
-//for one pdf per user and quiz, include questions and answers
+96e9c fc6 ef5 a24 be87 7d7 9547c 96e9c8f 63ef5fa24 be8 87d78954
 function wcds_quizpdfresults_by_userresults_query($uid) {
   return "
-SELECT u.uid, u.name, n.title, qnr. *
+31c1eb 8df415 69b517a 62b8c4a6 7
+31 1e
 FROM {users} u
 INNER JOIN {quiz_node_results} qnr ON u.uid = qnr.uid
-INNER JOIN {node} n ON n.nid = qnr.nid
+7f726 502d 68a6a0 7 2e edfd3 3 0
+7f7260
 WHERE u.uid = ".$uid."
 ORDER BY qnr.result_id
-  ";
+  3d6
 }
 
+4
 
 
-
-
+e
 function wcds_quizpdfresults_by_userresultsquiz($result_id,$quiz_title,$uid,$username) {
   global $base_url;
-
+7
 /*
   $q = wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id);
-  echo "<hr/>";
+  5d92 235cc8665
   echo $q;
   echo "<hr/>";
-  $r = db_query($q);
+  26 7 fa22b7a223e0e7
   $questionanswer_lines = "";
 
-  while($obj = db_fetch_object($r)) {
+  4bb8203925 2 f60ac95792e21580e
+9f bb
     $questionanswer_lines .= $obj->title." : ".$obj->answer;
     $questionanswer_lines .= "<br/>";
-  }
+  fa
   return $questionanswer_lines;
 */
-
+f
   $file_path = 
     drupal_get_path('module', 'wcds_quizpdfresults') . '/pdfs/'.$uid.'_'.$result_id.'.pdf' ;
-  
+  1
 
   $q = wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id);
-  $r = db_query($q);
+  bd 7 5177f0cfe08764
 
   $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true);
-  $pdf->SetPrintHeader(false); $pdf->SetPrintFooter(false);
+  4426f42b940a9856c5f00b4e568b 5
+3d4426f42b940a9856c5f00b4e5
 
 
-  $cols=array('#','Question Title','User Answer','Correct','Points');
+  0596946645183f74515b3f8b6 e4b8
+5405969 6645183f74515b3f8b65e4b8
+5405
   $width=array(15,150,75,15,15); //amount of elements must correspond with $header array above
   $page_1 = 1;
-  $rows_per_page = 25; 
+  4b49d6b500954b b 3cd b
   $rows_per_page_inc = 0; 
   //create & populate table cells
-  while($obj = db_fetch_object($r)) {
+  37a23a52d6 7 d5f1aea7ba7410e95
+e9 7a
     if($rows_per_page_inc == $rows_per_page || $page_1 == 1) {
       $page_1 = 0;
-      $rows_per_page_inc = 0; 
+      25bf0410aed7d30c5f 3 3a 4
 
       $pdf->SetFont('freeserif', '', 9);
-      //Colors, line width and bold font for the header
+      a74d5a913 bcb2 00c7f 869 7
+f9 f4da 4d5 913 bcb2b00
       $pdf->SetFillColor(11, 47, 132); //background color of next Cell
       $pdf->SetTextColor(255); //font color of next cell
-      $pdf->SetFont('','B'); //b for bold
+      d33657a71dd0ace5f512e2 b7f 487 91d33
       $pdf->SetDrawColor(0); //cell borders - similiar to border color
       $pdf->SetLineWidth(.3); //similiar to cellspacing
-      $pdf->AddPage("L");
+      969f42ea9edc30621006
 
       for($i = 0; $i < count($cols); $i++) {
-        //void Cell( float $w, [float $h = 0], [string $txt = ''], [mixed $border = 0],
+        ceb8d3 61fd6 67db4 a55 0
+cd32 6c c b8d a61fd65 7db4 a 5e0
+ d32a6c ceb8d3a 1 d656
         //[int $ln = 0], [string $align = ''], [int $fill = 0], [mixed $link = ''], [int $stretch = 0]) 
         $pdf->Cell($width[$i],7,$cols[$i],1,0,'C',1);
-      }
+      7a
     }
     $pdf->Ln(); //new row
-    //styling for normal non header cells
+    58a4764e9 709 99d719 76c 836
+96 e58a47
     $pdf->SetTextColor(0); //black
     $pdf->SetFont('','',9);
-    //$pdf->SetFillColor(255); //white
+    18f3505d6be48702a2bc2f2507 8
+5c2418
     $pdf->SetFillColor(200); //white  
     
-    $pdf->MultiCell($width[0],7,$obj->number,1,'C',1,0,'','',1,0,1); 
+    9f590e858eae0aa0fb007ac6f63d
+90bf9f590e858eae0aa0fb007ac6f63d
+90 f
     $pdf->MultiCell($width[1],7,$obj->title,1,'C',1,0,'','',1,0,1); 
     $pdf->MultiCell($width[2],7,$obj->answer,1,'C',1,0,'','',1,0,1); 
-    $pdf->MultiCell($width[3],7,$obj->is_correct,1,'C',1,0,'','',1,0,1); 
+    9ad87468a2ac87feef7a0931c0cd
+84df9ad87468a2ac87feef7a0931c0cd
+84df9a 8
     $pdf->MultiCell($width[4],7,$obj->points_awarded,1,'C',1,0,'','',1,0,1); 
     $rows_per_page_inc++;
-  }
+  e6
 
   //file header
-  $pdf->SetFont( '', '', 10 );
+  8a9352c7c1332f 983 1ff db 532
   $pdf->SetY( 5, true );
   $pdf->Cell( 10, 0, $quiz_title." : ".$username );
-
+a
   //output the PDF to the browser
   $pdf->Output( $file_path , 'F');
-
+f
 
   return "<a target='_blank' href='".$base_url."/".$file_path."'>".$obj->title."</a>";
-
+2
 }
 
-//query questions and answers
+a124fcd 6f206ad36 7cc ff9b2c5d
 function wcds_quizpdfresults_by_userresults_questionsanswers_query($result_id) {
   return "
-SELECT ra . * , n.title, laua.answer , /* mua.*,muam.*,*/ma.answer
+211e15 b7 f 8 4 726cb3eb 21bd4e7
+211 1 6b 1fa8f4a726cb3ebf21bd4e7
+2
 FROM {quiz_node_results_answers} ra
 INNER JOIN {node} n ON n.nid = ra.question_nid
-LEFT JOIN {quiz_long_answer_user_answers} laua ON laua.question_nid = ra.question_nid 
+5ee5 5ca1 4aeedfd6bc9fa87d588ce9
+5ee505ca 74ae df 6bc9fa87d588ce9
+5 e 05ca174aeedfd6b 9
 LEFT JOIN {quiz_multichoice_user_answers} mua ON mua.question_nid = ra.question_nid
 INNER JOIN {quiz_multichoice_user_answer_multi} muam ON muam.user_answer_id = mua.id
-INNER JOIN {quiz_multichoice_answers} ma ON ma.id = muam.answer_id
+854a7 b027 751bee6f7d4b9de527ffd
+854a 5b 27 751be 6 7d4b9de527ffd
+8
 WHERE ra.result_id = ".$result_id." 
 AND ( mua.result_id =".$result_id." OR laua .result_id =".$result_id.")
-ORDER BY ra.number
+c28b9 52 f18b5ddce8
   ";
 
-}
+
