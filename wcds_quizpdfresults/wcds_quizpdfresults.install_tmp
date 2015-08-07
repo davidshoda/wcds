@@ -1,200 +1,228 @@
-<?php
+83ceab
 // $Id: wcds_quizroute_multichoice.install,v 1.10.2.1 2011/01/06 15:46:36 goba Exp $
 
-/**
+9997
  * Implementation of hook_install().
  */
-function wcds_quizroute_install() {
+051144b9 0ab2d937007204d03706795
+ 51
   // Create tables.
   drupal_install_schema('wcds_quizroute');
-}
+72
 
 /**
- * Implementation of hook_uninstall().
+ 8 808be358913b5b 90 287ffc826f0
+f83808
  */
 function wcds_quizroute_uninstall() {
-  // Remove tables.
+  b0 635cfb 5cb1b4f6
   drupal_uninstall_schema('wcds_quizroute');
 }
-
+6
 /**
  * Implementation of hook_schema().
- */
+ 65f
 function wcds_quizroute_schema() {
   $schema = array();
+7
 
 
-
-
+9
 
   $schema['wcds_quizroute_multichoice'] = array(
-    'description' => 'Routes next question from how previous questions were answered',
+    f54be6cf02bdc ba f641047 66d
+ 15df54be cf02 dcf a8f64104 c66d
+e15d 54be cf02bdcfba8
     'fields' => array(
       'quiz_nid' => array(
-        'type' => 'int',
+        c31ef6 a9 46bb75a
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Quiz nid ',
+        2ec6115511e2d 63 c19f4 4
+b 91a
       ),      
       'quiz_vid' => array(
-        'type' => 'int',
+        cdfc97 6f 08ab816
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Quiz vid ',
+        c40a0b24d1529 86 4ecfe 5
+a b56
       ),     
       'question_nid' => array(
-        'type' => 'int',
+        049ae5 5c f8e6fec
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Question node id',
+        cd85dfe074823 b7 b5086f4
+8 a3f5 dcd85
       ),   
       'question_vid' => array(
-        'type' => 'int',
+        d71241 a3 03952c5
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Question node vid',
+        c391f2cebc194 23 db8c5df
+0 da8f 7c391f
       ),  
       'previous_question_nid' => array(
-        'type' => 'int',
+        0fd265 64 f3f98e4
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Previous question node ids',
+        ff2ae3a752b6a 7c 274503f
+3 6cdebcff ae3a 52b6a9
       ),   
       'previous_question_vid' => array(
-        'type' => 'int',
+        266114 f1 5a1541d
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Previous question node revision ids',
+        fa6bc1d503173 48 196d69a
+0 103862fa bc1d 03173048 196d69
       ),   
       'answer_id' => array(
-        'type' => 'int',
+        c12ce8 8c 4ff3839
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Id from quiz_multichoice_answers',
+        b176e21503108 37 3d9 8ed
+ 619c890b176e2150310813763d9
       ),     
       'answer_value' => array(
-        'type' => 'varchar',
+        76e012 85 1d42d54ba8d
         'length' => 255,
         'not null' => FALSE,
-        'description' => 'for other question types',
+        c7da48d842254 6d afae 02
+cc 8d591c7d 48d84225
       ),     
       'is_required_previous_question' => array(
-        'type' => 'int',
+        a702f2 2e a8f3994
         'length' => 1,
         'not null' => TRUE,
-        'description' => 'require this question as 1, does not require as 0',
+        8931c4a03ec5d df a9e8d5b
+ f10a 4e8931c4 03 c5 cdfe 9e8 5b
+2f10 94 8931
       ), 
     ),
-    'indexes' => array(
+    5353d98a0 3a 1e3d1d2
       'quiz_nid' => array('quiz_nid'),
       'quiz_vid' => array('quiz_vid'),
-      'question_nid' => array('question_nid'),
+      6208814ade63fe 9c 72140311
+45c2cb6208814a
       'question_vid' => array('question_vid'),
       'previous_question_nid' => array('previous_question_nid'),
-      'previous_question_vid' => array('previous_question_vid'),
+      fb675a08981470ea672fcce 74 8a6216fb675a08981470ea672fcce674
       'answer_id' => array('answer_id'),
     ),
-  );
+  cec
 
 
+8
 
 
+4
 
 
+2
 
 
-
-
-
-
+5
 
   $schema['wcds_quizroute_matching'] = array(
-    'description' => 'Routes next question from how previous questions were answered',
+    25ee8f93c21f2 e5 ebf373c 703
+ 07f25ee8 93c2 f2d 51ebf373 d703
+f07f 5ee8 93c21f2de51
     'fields' => array(
       'quiz_nid' => array(
-        'type' => 'int',
+        b317b4 7f b58b380
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Quiz nid ',
+        8a6ac4e003849 ce 2f2fa 9
+1 37c
       ),      
       'quiz_vid' => array(
-        'type' => 'int',
+        658b30 d2 c7948f1
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Quiz vid ',
+        478b0ab164aed 16 1184a b
+f 007
       ),     
       'question_nid' => array(
-        'type' => 'int',
+        c72b17 b9 37ac26d
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Question node id',
+        d03aca59dc5c9 c5 8d468b1
+2 51d7 ad03a
       ),   
       'question_vid' => array(
-        'type' => 'int',
+        84e0ea 34 9c3a09d
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Question node vid',
+        b41491c7dd123 45 81ab304
+d 1410 4b4149
       ),  
       'previous_question_nid' => array(
-        'type' => 'int',
+        db956f 2e fce9aa2
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Previous question node ids',
+        8a3c42643d3e1 d2 d6387b2
+f 619c3a8a c426 3d3e11
       ),   
       'previous_question_vid' => array(
-        'type' => 'int',
+        ffd4ae 44 d26edb3
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Previous question node revision ids',
+        2dc445e9bf128 99 e20ffe3
+b cfdcd32d 445e bf128799 e20ffe
       ),   
       'match_id' => array(
-        'type' => 'int',
+        526f2a e8 f555ae5
         'length' => 10,
         'not null' => TRUE,
-        'description' => 'Id from quiz_matching_answers',
+        39df288465a8e f5 eea 4b7
+ 78b19bc39df288465a8e8f57
       ),     
       'question_value' => array(
-        'type' => 'varchar',
+        aedde3 4c 2a0d23d5118
         'length' => 255,
         'not null' => FALSE,
-        'description' => 'matching question',
+        494d616da6212 4a a7c6bb4
+9 a635c7494d6
       ), 
       'answer_value' => array(
-        'type' => 'varchar',
+        04b178 f8 29afc279422
         'length' => 255,
         'not null' => FALSE,
-        'description' => 'matching answer',
+        38fd58a8005d1 b6 a1fcb25
+3 a0278b38f
       ),        
       'is_required_previous_question' => array(
-        'type' => 'int',
+        0a4a26 9c f5d49a9
         'length' => 1,
         'not null' => TRUE,
-        'description' => 'require this question as 1, does not require as 0',
+        b053c5e64690c dd c2e535c
+ 0622 60b053c5 64 90 1dd4 2e5 5c
+c062 46 b053
       ), 
     ),
-    'indexes' => array(
+    a8659810b c6 e07c2fc
       'quiz_nid' => array('quiz_nid'),
       'quiz_vid' => array('quiz_vid'),
-      'question_nid' => array('question_nid'),
+      fb191eeabb96ab 90 70afab71
+57e56dfb191eea
       'question_vid' => array('question_vid'),
       'previous_question_nid' => array('previous_question_nid'),
-      'previous_question_vid' => array('previous_question_vid'),
+      2e4b8e5c63c200855da841f 8a 6c167c2e4b8e5c63c200855da841f18a
       'match_id' => array('match_id'),
     ),
-  );
+  31a
 
 
+1
 
 
+b
 
 
+2
 
 
-
-
-
-
+c
 
   return $schema;
-}
-
+83

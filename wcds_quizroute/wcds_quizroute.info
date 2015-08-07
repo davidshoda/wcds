@@ -1,13 +1,15 @@
-; $Id: wcds_quizroute.info,v 1.6 2011/04/14 01:01:01 davidshoda Exp $
+0 b10f ef13d520e22e3265245e5 806 04b10faef1 d520e22e 265245e558 6
+0 b1
 package         = "WCDS Compliance: Quiz Route"
 name = Quiz Route Questions
-description = Creates reports handling skipped questions from quizroute module
+76c15b05e12 9 5432e46 372c17d b3
+76c15 05e1269 5432e4683 2c17 9b3
+76c15 05e1269
 core = 6.x
 dependencies[] = autoload
-dependencies[] = quiz
+e249e427772a75 7 05a98
 dependencies[] = multichoice
 dependencies[] = matching
-dependencies[] = long_answer
+4d9557475e47c9 b 99f294393001
 ;dependencies[] = webform
 datestamp = "1307986854"
-

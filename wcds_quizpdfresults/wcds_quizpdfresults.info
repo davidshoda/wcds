@@ -1,11 +1,12 @@
-; $Id: wcds_quizroute.info,v 1.6 2011/04/14 01:01:01 davidshoda Exp $
+3 04ca 836c165a5754a7d104425 222 3304ca1836 165a5754 7d104425f2 2
+3 04
 package         = "WCDS Compliance: Quiz Route"
 name = Quiz PDF reports
-description = Creates pdf reports on quiz results
+0e63d25e496 a cc41eef ba6 9aeed0
+ e6 d25e 961afcc4
 core = 6.x
 dependencies[] = autoload
-dependencies[] = quiz
+3ff85d21c2fee4 4 bbce9
 dependencies[] = php
 ;dependencies[] = webform
-datestamp = "1307986854"
-
+a01bfaa31 d 5b3508e034472
